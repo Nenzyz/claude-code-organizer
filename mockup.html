@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Claude Inventory</title>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+<style>
+  :root {
+    --bg: #fafbfc;
+    --surface: #ffffff;
+    --border: #e2e4ea;
+    --border-light: #eef0f4;
+    --text-primary: #1e2028;
+    --text-secondary: #5a5d6e;
+    --text-muted: #9598a8;
+    --text-faint: #c2c5d0;
+    --accent: #5b5fc7;
+    --accent-light: #ededfa;
+    --accent-text: #4345a0;
+    --scope-bg: #f0f1f8;
+    --scope-border: #d8dae8;
+    --cat-bg: #f6f7fb;
+    --cat-border: #e8e9f0;
+    --hover: #f5f6fa;
+    --tag-global-bg: #e8e9fa; --tag-global-text: #5b5fc7;
+    --tag-workspace-bg: #fef0e4; --tag-workspace-text: #c67a2e;
+    --tag-project-bg: #e4f6ec; --tag-project-text: #2d8a56;
+    --badge-feedback: #e6960a; --badge-user: #7c3aed; --badge-project: #2563eb;
+    --badge-reference: #059669; --badge-skill: #ea580c; --badge-mcp: #d946a8;
+    --badge-config: #9ca3af;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-md: 0 2px 8px rgba(0,0,0,0.06);
+    --radius: 10px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:var(--bg); color:var(--text-primary); height:100vh; overflow:hidden; -webkit-font-smoothing:antialiased; font-size:14px; }
+  .app { display:flex; height:100vh; }
+  .tree-area { flex:1; overflow-y:auto; padding:32px 40px 80px; max-width:920px; margin:0 auto; }
+
+  /* ── Page header ── */
+  .page-hdr { display:flex; align-items:center; gap:16px; margin-bottom:32px; }
+  .logo { width:32px; height:32px; background:var(--accent); border-radius:8px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:16px; font-weight:700; }
+  .page-hdr h1 { font-size:1.25rem; color:var(--text-primary); font-weight:700; letter-spacing:-0.4px; }
+  .spacer { flex:1; }
+  .search { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:8px 14px; color:var(--text-primary); font-size:0.8rem; width:200px; font-family:inherit; outline:none; transition:all 0.15s; }
+  .search:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-light); }
+  .search::placeholder { color:var(--text-faint); }
+  .pills { display:flex; gap:4px; }
+  .pill { background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:5px 14px; color:var(--text-secondary); font-size:0.72rem; cursor:pointer; font-weight:500; transition:all 0.15s; }
+  .pill:hover { background:var(--hover); border-color:var(--scope-border); }
+  .pill.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+
+  /* ══════════════════════════════════════════
+     SCOPE HEADER — Most prominent
+     ══════════════════════════════════════════ */
+  .scope-block { margin-bottom:4px; }
+  .scope-block .scope-block { margin-left:20px; }
+
+  .scope-hdr {
+    display:flex; align-items:center; gap:10px;
+    padding:12px 16px; cursor:pointer; border-radius:var(--radius);
+    background:var(--scope-bg); border:1px solid var(--scope-border);
+    user-select:none; transition:all 0.15s; margin-bottom:3px;
+  }
+  .scope-hdr:hover { background:#e8e9f4; border-color:#cfd1e2; }
+  .scope-tog { width:16px; text-align:center; color:var(--accent); font-size:0.7rem; transition:transform 0.15s; }
+  .scope-tog.c { transform:rotate(-90deg); }
+  .scope-ico { font-size:1rem; }
+  .scope-nm { font-size:0.95rem; font-weight:700; color:var(--text-primary); letter-spacing:-0.2px; }
+  .scope-tag { font-size:0.58rem; padding:2px 8px; border-radius:5px; font-weight:600; }
+  .tag-global { background:var(--tag-global-bg); color:var(--tag-global-text); }
+  .tag-workspace { background:var(--tag-workspace-bg); color:var(--tag-workspace-text); }
+  .tag-project { background:var(--tag-project-bg); color:var(--tag-project-text); }
+  .scope-info { font-size:0.65rem; color:var(--text-muted); margin-left:auto; }
+  .scope-cnt { background:var(--accent-light); color:var(--accent-text); border-radius:10px; padding:2px 9px; font-size:0.62rem; font-weight:700; }
+
+  .scope-body { padding:0 0 6px; }
+  .scope-body.c { display:none; }
+  .inherit { font-size:0.68rem; color:var(--accent-text); padding:6px 14px 10px 40px; font-style:normal; font-weight:500; display:flex; align-items:center; gap:6px; }
+  .inherit-pill { background:var(--accent-light); color:var(--accent-text); padding:2px 8px; border-radius:4px; font-size:0.6rem; font-weight:600; }
+  .inherit-arrow { color:var(--accent); font-size:0.8rem; }
+
+  /* ══════════════════════════════════════════
+     CATEGORY BAR — Medium prominence
+     ══════════════════════════════════════════ */
+  .cat-hdr {
+    display:flex; align-items:center; gap:8px;
+    padding:8px 14px; margin:4px 0 2px 24px; cursor:pointer;
+    background:var(--cat-bg); border:1px solid var(--cat-border);
+    border-radius:8px; user-select:none; transition:all 0.15s;
+  }
+  .cat-hdr:hover { background:#eeeef6; border-color:#dddee8; }
+  .cat-tog { width:14px; text-align:center; color:var(--text-muted); font-size:0.6rem; transition:transform 0.15s; }
+  .cat-tog.c { transform:rotate(-90deg); }
+  .cat-ico { font-size:0.85rem; }
+  .cat-nm { font-size:0.72rem; color:var(--text-secondary); font-weight:700; text-transform:uppercase; letter-spacing:1px; }
+  .cat-cnt { font-size:0.62rem; color:var(--text-muted); margin-left:auto; font-weight:500; }
+
+  .cat-body { padding:0; }
+  .cat-body.c { display:none; }
+
+  /* ══════════════════════════════════════════
+     ITEM ROW — Least prominent, subtle
+     ══════════════════════════════════════════ */
+  .sortable-zone { min-height:4px; margin-left:64px; padding:2px 0; }
+
+  .item-row {
+    display:flex; align-items:center; gap:8px;
+    padding:6px 10px; margin:1px 0; border-radius:6px;
+    cursor:grab; transition:all 0.1s;
+    border:1px solid transparent;
+  }
+  .item-row:hover { background:var(--hover); border-color:var(--border-light); }
+  .item-row:active { cursor:grabbing; }
+  .item-row.sortable-ghost { opacity:0.2; border:1px dashed var(--accent); background:var(--accent-light); }
+  .item-row.sortable-chosen { background:var(--accent-light); border-color:var(--accent); }
+  .item-row.locked { opacity:0.35; cursor:default; }
+  .item-row.selected { background:var(--accent-light); border-color:var(--accent); }
+
+  .row-ico { font-size:0.72rem; flex-shrink:0; }
+  .row-name { font-size:0.75rem; color:var(--text-secondary); font-weight:500; flex-shrink:0; max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .row-badge { font-size:0.5rem; padding:1px 5px; border-radius:3px; color:#fff; font-weight:600; flex-shrink:0; }
+  .b-feedback { background:var(--badge-feedback); }
+  .b-user { background:var(--badge-user); }
+  .b-project { background:var(--badge-project); }
+  .b-reference { background:var(--badge-reference); }
+  .b-skill { background:var(--badge-skill); }
+  .b-mcp { background:var(--badge-mcp); }
+  .b-config { background:var(--badge-config); }
+  .row-desc { font-size:0.65rem; color:var(--text-muted); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .row-meta { font-size:0.58rem; color:var(--text-faint); flex-shrink:0; }
+  .row-acts { display:flex; gap:3px; opacity:0; transition:opacity 0.1s; flex-shrink:0; }
+  .item-row:hover .row-acts { opacity:1; }
+  .rbtn { background:var(--surface); border:1px solid var(--border); border-radius:5px; color:var(--text-secondary); padding:3px 8px; cursor:pointer; font-size:0.6rem; font-family:inherit; transition:all 0.12s; }
+  .rbtn:hover { background:var(--accent); color:#fff; border-color:var(--accent); }
+
+  /* ── Detail panel ── */
+  .detail { width:340px; border-left:1px solid var(--border); display:flex; flex-direction:column; flex-shrink:0; background:var(--surface); }
+  .detail.hidden { display:none; }
+  .detail-hdr { padding:18px 20px; border-bottom:1px solid var(--border-light); display:flex; align-items:center; }
+  .detail-hdr h2 { font-size:0.88rem; color:var(--text-primary); flex:1; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .detail-x { background:none; border:none; color:var(--text-faint); cursor:pointer; font-size:1.1rem; transition:color 0.1s; }
+  .detail-x:hover { color:var(--text-primary); }
+  .detail-bd { flex:1; overflow-y:auto; padding:18px 20px; }
+  .df { margin-bottom:16px; }
+  .dl { font-size:0.6rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.8px; margin-bottom:4px; font-weight:600; }
+  .dv { font-size:0.78rem; color:var(--text-secondary); line-height:1.4; }
+  .dv a { color:var(--accent); text-decoration:none; }
+  .detail-ft { padding:16px 20px; border-top:1px solid var(--border-light); display:flex; gap:8px; }
+  .btn { padding:7px 16px; border-radius:8px; font-size:0.73rem; cursor:pointer; font-family:inherit; border:1px solid var(--border); font-weight:500; transition:all 0.15s; }
+  .btn-p { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .btn-p:hover { background:#4e52b8; }
+  .btn-s { background:var(--surface); color:var(--text-secondary); }
+  .btn-s:hover { background:var(--hover); }
+
+  /* ── Modals ── */
+  .modal-bg { position:fixed; inset:0; background:rgba(30,32,40,0.25); display:flex; align-items:center; justify-content:center; z-index:100; backdrop-filter:blur(3px); }
+  .modal-bg.hidden { display:none; }
+  .modal { background:var(--surface); border:1px solid var(--border); border-radius:16px; width:420px; padding:24px; box-shadow:var(--shadow-md), 0 12px 40px rgba(0,0,0,0.08); }
+  .modal h3 { font-size:1rem; color:var(--text-primary); font-weight:700; margin-bottom:6px; }
+  .modal .modal-sub { font-size:0.7rem; color:var(--text-muted); margin-bottom:16px; }
+  .move-preview { background:var(--bg); border:1px solid var(--border-light); border-radius:10px; padding:16px; margin-bottom:18px; font-size:0.78rem; line-height:1.8; }
+  .move-from { color:#dc2626; font-weight:600; }
+  .move-to { color:#16a34a; font-weight:600; }
+  .move-item { color:var(--accent); font-weight:700; }
+  .modal-btns { display:flex; gap:8px; justify-content:flex-end; }
+  .modal-body { max-height:40vh; overflow-y:auto; margin-bottom:16px; }
+
+  .dest { padding:10px 14px; cursor:pointer; border-radius:8px; display:flex; align-items:center; gap:10px; font-size:0.78rem; margin:2px 0; border:1px solid transparent; transition:all 0.12s; }
+  .dest:hover { background:var(--hover); }
+  .dest.sel { background:var(--accent-light); border-color:var(--accent); }
+  .dest.cur { opacity:0.35; pointer-events:none; }
+  .dest.cur::after { content:'(current)'; font-size:0.58rem; color:var(--text-faint); margin-left:4px; }
+  .dest .di { font-size:0.85rem; }
+  .dest .dn { color:var(--text-primary); font-weight:600; }
+  .dest .dp { color:var(--text-muted); font-size:0.6rem; margin-left:auto; }
+
+  .toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:var(--text-primary); color:#fff; padding:12px 28px; border-radius:12px; font-size:0.78rem; z-index:200; box-shadow:0 4px 20px rgba(0,0,0,0.12); font-weight:500; }
+  .toast.hidden { display:none; }
+
+  ::-webkit-scrollbar { width:6px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+  ::-webkit-scrollbar-thumb:hover { background:var(--text-faint); }
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="app">
+<div class="tree-area">
+  <div class="page-hdr">
+    <div class="logo">C</div>
+    <h1>Claude Inventory</h1>
+    <span class="spacer"></span>
+    <div class="pills">
+      <span class="pill active" onclick="filterAll(this)">All</span>
+      <span class="pill" onclick="ft('memory',this)">🧠 Memory</span>
+      <span class="pill" onclick="ft('skill',this)">⚡ Skills</span>
+      <span class="pill" onclick="ft('mcp',this)">🔌 MCP</span>
+    </div>
+    <input class="search" placeholder="Search..." id="si">
+  </div>
+
+  <!-- ═══ GLOBAL ═══ -->
+  <div class="scope-block">
+    <div class="scope-hdr" onclick="togS(this)"><span class="scope-tog">▼</span><span class="scope-ico">🌐</span><span class="scope-nm">Global</span><span class="scope-tag tag-global">applies everywhere</span><span class="scope-info"></span><span class="scope-cnt">21</span></div>
+    <div class="scope-body">
+      <div class="cat-hdr" data-cat="config" onclick="togC(this)"><span class="cat-tog">▼</span><span class="cat-ico">⚙️</span><span class="cat-nm">Config</span><span class="cat-cnt">3</span></div>
+      <div class="cat-body" data-cat="config"><div class="sortable-zone">
+        <div class="item-row locked" data-t="config"><span class="row-ico">📋</span><span class="row-name">CLAUDE.md</span><span class="row-badge b-config">🔒</span><span class="row-desc">Global instructions</span><span class="row-meta">5.1K</span></div>
+        <div class="item-row locked" data-t="config"><span class="row-ico">⚙️</span><span class="row-name">settings.json</span><span class="row-badge b-config">🔒</span><span class="row-meta">3.0K</span></div>
+        <div class="item-row locked" data-t="config"><span class="row-ico">⚙️</span><span class="row-name">settings.local.json</span><span class="row-badge b-config">🔒</span><span class="row-meta">4.4K</span></div>
+      </div></div>
+
+      <div class="cat-hdr" data-cat="memory" onclick="togC(this)"><span class="cat-tog">▼</span><span class="cat-ico">🧠</span><span class="cat-nm">Memories</span><span class="cat-cnt">2</span></div>
+      <div class="cat-body" data-cat="memory"><div class="sortable-zone" id="z-g-mem" data-scope="Global" data-group="memory">
+        <div class="item-row" data-t="memory" onclick="sd(this,'Use company GitHub for company repos','Always use nicole-alltrue for AllTrue repos, not ithiria894 (personal). gh CLI v2.88.1 with dual account setup.','feedback','Global','1.0K','2026-03-17')"><span class="row-ico">🧠</span><span class="row-name">Use company GitHub for company repos</span><span class="row-badge b-feedback">feedback</span><span class="row-desc">Always use nicole-alltrue for AllTrue repos</span><span class="row-meta">1.0K</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+        <div class="item-row" data-t="memory" onclick="sd(this,'Always teach with real code','After every task, walkthrough what was done using real merged code. Teach like explaining to a high schooler.','feedback','Global','1.7K','2026-03-17')"><span class="row-ico">🧠</span><span class="row-name">Always teach with real code</span><span class="row-badge b-feedback">feedback</span><span class="row-desc">Walkthrough using real merged code</span><span class="row-meta">1.7K</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+      </div></div>
+
+      <div class="cat-hdr" data-cat="skill" onclick="togC(this)"><span class="cat-tog">▼</span><span class="cat-ico">⚡</span><span class="cat-nm">Skills</span><span class="cat-cnt">17</span></div>
+      <div class="cat-body" data-cat="skill"><div class="sortable-zone" id="z-g-skill" data-scope="Global" data-group="skill">
+        <div class="item-row" data-t="skill"><span class="row-ico">⚡</span><span class="row-name">chrome-cdp</span><span class="row-badge b-skill">skill</span><span class="row-desc">Interact with local Chrome browser</span><span class="row-meta">3.1K</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+        <div class="item-row" data-t="skill"><span class="row-ico">⚡</span><span class="row-name">fullstack-debug</span><span class="row-badge b-skill">skill</span><span class="row-desc">Full-stack debugging workflow</span><span class="row-meta">24.2K</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+        <div class="item-row" data-t="skill"><span class="row-ico">⚡</span><span class="row-name">auto-commit</span><span class="row-badge b-skill">skill</span><span class="row-desc">Pre-commit, stage, commit</span><span class="row-meta">2.5K</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+        <div class="item-row" data-t="skill"><span class="row-ico">⚡</span><span class="row-name">code-review</span><span class="row-badge b-skill">skill</span><span class="row-desc">CodeRabbit critical review</span><span class="row-meta">6.3K</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+        <div class="item-row" data-t="skill"><span class="row-ico">⚡</span><span class="row-name">journal</span><span class="row-badge b-skill">skill</span><span class="row-desc">Daily work journal</span><span class="row-meta">7.7K</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+        <div class="item-row" data-t="skill"><span class="row-ico">⚡</span><span class="row-name">babysit-pr</span><span class="row-badge b-skill">skill</span><span class="row-desc">Monitor PRs, auto-merge when CI passes</span><span class="row-meta">4.7K</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+        <div class="item-row" data-t="skill"><span class="row-ico">⚡</span><span class="row-name">claude-inventory</span><span class="row-badge b-skill">skill</span><span class="row-desc">Visualize all Claude Code customizations</span><span class="row-meta">1.5K</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+        <div class="item-row" data-t="skill"><span class="row-ico">⚡</span><span class="row-name">file-tax</span><span class="row-badge b-skill">skill</span><span class="row-desc">File Canadian income tax return</span><span class="row-meta">7.5K</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+        <div class="item-row" data-t="skill"><span class="row-ico">⚡</span><span class="row-name">git-log</span><span class="row-badge b-skill">skill</span><span class="row-desc">Search git history for changes</span><span class="row-meta">3.3K</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+        <div class="item-row" data-t="skill"><span class="row-ico">⚡</span><span class="row-name">inspect-branch</span><span class="row-badge b-skill">skill</span><span class="row-desc">Inspect local branches and PR links</span><span class="row-meta">795B</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+        <div class="item-row" data-t="skill"><span class="row-ico">⚡</span><span class="row-name">paraphrase</span><span class="row-badge b-skill">skill</span><span class="row-desc">Rewrite message into natural English</span><span class="row-meta">3.2K</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+        <div class="item-row" data-t="skill"><span class="row-ico">⚡</span><span class="row-name">slack-update</span><span class="row-badge b-skill">skill</span><span class="row-desc">Short Slack-style progress update</span><span class="row-meta">2.5K</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+        <div class="item-row" data-t="skill"><span class="row-ico">⚡</span><span class="row-name">submit-ticket</span><span class="row-badge b-skill">skill</span><span class="row-desc">Submit Varonis IT ServiceNow ticket</span><span class="row-meta">7.5K</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+        <div class="item-row" data-t="skill"><span class="row-ico">⚡</span><span class="row-name">todo</span><span class="row-badge b-skill">skill</span><span class="row-desc">Manage personal TODO list</span><span class="row-meta">4.7K</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+        <div class="item-row" data-t="skill"><span class="row-ico">⚡</span><span class="row-name">update-branch</span><span class="row-badge b-skill">skill</span><span class="row-desc">Merge develop into feature branch</span><span class="row-meta">812B</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+        <div class="item-row" data-t="skill"><span class="row-ico">⚡</span><span class="row-name">aws-login</span><span class="row-badge b-skill">skill</span><span class="row-desc">Check and refresh AWS SSO credentials</span><span class="row-meta">1.7K</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+        <div class="item-row" data-t="skill"><span class="row-ico">⚡</span><span class="row-name">all-open-pr-code-review</span><span class="row-badge b-skill">skill</span><span class="row-desc">CodeRabbit review on all open PRs</span><span class="row-meta">6.5K</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+      </div></div>
+
+      <div class="cat-hdr" data-cat="mcp" onclick="togC(this)"><span class="cat-tog">▼</span><span class="cat-ico">🔌</span><span class="cat-nm">MCP Servers</span><span class="cat-cnt">2</span></div>
+      <div class="cat-body" data-cat="mcp"><div class="sortable-zone" id="z-g-mcp" data-scope="Global" data-group="mcp">
+        <div class="item-row" data-t="mcp"><span class="row-ico">🔌</span><span class="row-name">gmail</span><span class="row-badge b-mcp">mcp</span><span class="row-desc">@gongrzhe/server-gmail-autoauth-mcp</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button></span></div>
+        <div class="item-row" data-t="mcp"><span class="row-ico">🔌</span><span class="row-name">playwright</span><span class="row-badge b-mcp">mcp</span><span class="row-desc">@playwright/mcp@latest</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button></span></div>
+      </div></div>
+    </div>
+  </div>
+
+  <!-- Projects wrapper (indented from Global) -->
+  <div style="margin-left:20px;">
+
+  <!-- ═══ ALLTRUEAI ═══ -->
+  <div class="scope-block">
+    <div class="scope-hdr" onclick="togS(this)"><span class="scope-tog">▼</span><span class="scope-ico">📂</span><span class="scope-nm">AlltrueAi</span><span class="scope-tag tag-workspace">workspace</span><span class="scope-info">3 sub-projects</span><span class="scope-cnt">28</span></div>
+    <div class="scope-body">
+      <div class="inherit"><span class="inherit-arrow">↳</span> Inherits <span class="inherit-pill">🌐 Global</span></div>
+      <div class="cat-hdr" data-cat="memory" onclick="togC(this)"><span class="cat-tog">▼</span><span class="cat-ico">🧠</span><span class="cat-nm">Memories</span><span class="cat-cnt">1</span></div>
+      <div class="cat-body" data-cat="memory"><div class="sortable-zone" id="z-at-mem" data-scope="AlltrueAi" data-group="memory">
+        <div class="item-row" data-t="memory"><span class="row-ico">🧠</span><span class="row-name">Chrome Pilot testing goals</span><span class="row-badge b-project">project</span><span class="row-desc">Testing goals for chrome-pilot 0.4.0</span><span class="row-meta">2.1K</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+      </div></div>
+
+      <div class="cat-hdr" data-cat="mcp" onclick="togC(this)"><span class="cat-tog">▼</span><span class="cat-ico">🔌</span><span class="cat-nm">MCP Servers</span><span class="cat-cnt">1</span></div>
+      <div class="cat-body" data-cat="mcp"><div class="sortable-zone" id="z-at-mcp" data-scope="AlltrueAi" data-group="mcp">
+        <div class="item-row" data-t="mcp"><span class="row-ico">🔌</span><span class="row-name">logfire</span><span class="row-badge b-mcp">mcp</span><span class="row-desc">Logfire MCP server</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button></span></div>
+      </div></div>
+
+      <div class="scope-block">
+        <div class="scope-hdr" onclick="togS(this)"><span class="scope-tog">▼</span><span class="scope-ico">📂</span><span class="scope-nm">ai-security-control-plane</span><span class="scope-tag tag-project">project</span><span class="scope-cnt">22</span></div>
+        <div class="scope-body">
+          <div class="inherit"><span class="inherit-arrow">↳</span> Inherits <span class="inherit-pill">🌐 Global</span> <span class="inherit-pill">📂 AlltrueAi</span></div>
+          <div class="cat-hdr" data-cat="memory" onclick="togC(this)"><span class="cat-tog">▼</span><span class="cat-ico">🧠</span><span class="cat-nm">Memories</span><span class="cat-cnt">8</span></div>
+          <div class="cat-body" data-cat="memory"><div class="sortable-zone" id="z-ascp-mem" data-scope="ai-security-control-plane" data-group="memory">
+            <div class="item-row" data-t="memory"><span class="row-ico">🧠</span><span class="row-name">Minimize screenshots</span><span class="row-badge b-feedback">feedback</span><span class="row-desc">Avoid screenshots with Chrome DevTools</span><span class="row-meta">607B</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+            <div class="item-row" data-t="memory"><span class="row-ico">🧠</span><span class="row-name">Stop asking permission</span><span class="row-badge b-feedback">feedback</span><span class="row-desc">Never ask "can I?" — just execute</span><span class="row-meta">1.1K</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+            <div class="item-row" data-t="memory"><span class="row-ico">🧠</span><span class="row-name">Verify DB schema before SQL</span><span class="row-badge b-feedback">feedback</span><span class="row-desc">Read actual DB models first</span><span class="row-meta">770B</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+            <div class="item-row" data-t="memory"><span class="row-ico">🧠</span><span class="row-name">MCP Activity Dashboard</span><span class="row-badge b-reference">reference</span><span class="row-desc">Dashboard data flow, DB tables</span><span class="row-meta">7.3K</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+            <div class="item-row" data-t="memory"><span class="row-ico">🧠</span><span class="row-name">user_languages</span><span class="row-badge b-user">user</span><span class="row-desc">Cantonese, English, Mandarin, Japanese</span><span class="row-meta">284B</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+            <div class="item-row" data-t="memory"><span class="row-ico">🧠</span><span class="row-name">Slack updates don't need recipient</span><span class="row-badge b-feedback">feedback</span><span class="row-desc">Don't ask who the message is for</span><span class="row-meta">731B</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+            <div class="item-row" data-t="memory"><span class="row-ico">🧠</span><span class="row-name">Always use slack-update skill for reports</span><span class="row-badge b-feedback">feedback</span><span class="row-desc">All reports must use /slack-update skill</span><span class="row-meta">668B</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+            <div class="item-row" data-t="memory"><span class="row-ico">🧠</span><span class="row-name">Playground environment URLs</span><span class="row-badge b-reference">reference</span><span class="row-desc">AllTrue playground frontend and API URLs</span><span class="row-meta">349B</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+          </div></div>
+
+          <div class="cat-hdr" data-cat="skill" onclick="togC(this)"><span class="cat-tog">▼</span><span class="cat-ico">⚡</span><span class="cat-nm">Skills</span><span class="cat-cnt">14</span></div>
+          <div class="cat-body" data-cat="skill"><div class="sortable-zone" id="z-ascp-skill" data-scope="ai-security-control-plane" data-group="skill">
+            <div class="item-row" data-t="skill"><span class="row-ico">⚡</span><span class="row-name">test-runner</span><span class="row-badge b-skill">skill</span><span class="row-desc">Run tests — verify before committing</span><span class="row-meta">4.3K</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+            <div class="item-row" data-t="skill"><span class="row-ico">⚡</span><span class="row-name">test-generator</span><span class="row-badge b-skill">skill</span><span class="row-desc">Guide writing pytest tests</span><span class="row-meta">4.8K</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+            <div class="item-row" data-t="skill"><span class="row-ico">⚡</span><span class="row-name">register-guardrail</span><span class="row-badge b-skill">skill</span><span class="row-desc">Register guardrail end-to-end</span><span class="row-meta">11.8K</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+            <div class="item-row" data-t="skill"><span class="row-ico">⚡</span><span class="row-name">create-db-table</span><span class="row-badge b-skill">skill</span><span class="row-desc">Create database table</span><span class="row-meta">8.9K</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+            <div class="item-row" data-t="skill"><span class="row-ico">⚡</span><span class="row-name">create-schema</span><span class="row-badge b-skill">skill</span><span class="row-desc">Create Pydantic schema</span><span class="row-meta">9.6K</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+            <div class="item-row" data-t="skill"><span class="row-ico">⚡</span><span class="row-name">generate-alembic-migration</span><span class="row-badge b-skill">skill</span><span class="row-desc">Generate Alembic migration</span><span class="row-meta">3.5K</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+            <div class="item-row" data-t="skill"><span class="row-ico">⚡</span><span class="row-name">make-pr</span><span class="row-badge b-skill">skill</span><span class="row-desc">Create GitHub pull request</span><span class="row-meta">3.0K</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+            <div class="item-row" data-t="skill"><span class="row-ico">⚡</span><span class="row-name">new-feature-branch</span><span class="row-badge b-skill">skill</span><span class="row-desc">Start new feature branch</span><span class="row-meta">4.3K</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+            <div class="item-row" data-t="skill"><span class="row-ico">⚡</span><span class="row-name">new-router</span><span class="row-badge b-skill">skill</span><span class="row-desc">Create new API router</span><span class="row-meta">9.7K</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+            <div class="item-row" data-t="skill"><span class="row-ico">⚡</span><span class="row-name">paginate-graphql-endpoint</span><span class="row-badge b-skill">skill</span><span class="row-desc">Add pagination to GraphQL</span><span class="row-meta">10.0K</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+            <div class="item-row" data-t="skill"><span class="row-ico">⚡</span><span class="row-name">paginate-rest-endpoint</span><span class="row-badge b-skill">skill</span><span class="row-desc">Add pagination to REST</span><span class="row-meta">9.8K</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+            <div class="item-row" data-t="skill"><span class="row-ico">⚡</span><span class="row-name">query-local-db</span><span class="row-badge b-skill">skill</span><span class="row-desc">Query local database</span><span class="row-meta">2.1K</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+            <div class="item-row" data-t="skill"><span class="row-ico">⚡</span><span class="row-name">skill-builder</span><span class="row-badge b-skill">skill</span><span class="row-desc">Create a new Claude Code skill</span><span class="row-meta">2.9K</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+            <div class="item-row" data-t="skill"><span class="row-ico">⚡</span><span class="row-name">add-common-error</span><span class="row-badge b-skill">skill</span><span class="row-desc">Document new common error pattern</span><span class="row-meta">1.7K</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+          </div></div>
+        </div>
+      </div>
+
+      <div class="scope-block"><div class="scope-hdr" onclick="togS(this)"><span class="scope-tog c">▼</span><span class="scope-ico">📂</span><span class="scope-nm">ai-security-ui</span><span class="scope-tag tag-project">project</span><span class="scope-cnt">3</span></div><div class="scope-body c"></div></div>
+      <div class="scope-block"><div class="scope-hdr" onclick="togS(this)"><span class="scope-tog c">▼</span><span class="scope-ico">📂</span><span class="scope-nm">rule-processor</span><span class="scope-tag tag-project">project</span><span class="scope-cnt">8</span></div><div class="scope-body c"></div></div>
+    </div>
+  </div>
+
+  <!-- ═══ MYGITHUB ═══ -->
+  <div class="scope-block">
+    <div class="scope-hdr" onclick="togS(this)"><span class="scope-tog">▼</span><span class="scope-ico">📂</span><span class="scope-nm">MyGithub</span><span class="scope-tag tag-project">project</span><span class="scope-cnt">10</span></div>
+    <div class="scope-body">
+      <div class="inherit"><span class="inherit-arrow">↳</span> Inherits <span class="inherit-pill">🌐 Global</span></div>
+      <div class="cat-hdr" data-cat="memory" onclick="togC(this)"><span class="cat-tog">▼</span><span class="cat-ico">🧠</span><span class="cat-nm">Memories</span><span class="cat-cnt">10</span></div>
+      <div class="cat-body" data-cat="memory"><div class="sortable-zone" id="z-mg-mem" data-scope="MyGithub" data-group="memory">
+        <div class="item-row" data-t="memory"><span class="row-ico">🧠</span><span class="row-name">Use Codex for personal study</span><span class="row-badge b-feedback">feedback</span><span class="row-desc">Study code must go through Codex CLI</span><span class="row-meta">1.6K</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+        <div class="item-row" data-t="memory"><span class="row-ico">🧠</span><span class="row-name">MyGithub uses personal GitHub</span><span class="row-badge b-feedback">feedback</span><span class="row-desc">All repos must use ithiria894</span><span class="row-meta">1.0K</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+        <div class="item-row" data-t="memory"><span class="row-ico">🧠</span><span class="row-name">Nicole's AI usage profile</span><span class="row-badge b-user">user</span><span class="row-desc">Heavy AI user, AI as infrastructure</span><span class="row-meta">1.0K</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+        <div class="item-row" data-t="memory"><span class="row-ico">🧠</span><span class="row-name">Business philosophy — system architect</span><span class="row-badge b-user">user</span><span class="row-desc">Businesses as distributed systems</span><span class="row-meta">1.1K</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+        <div class="item-row" data-t="memory"><span class="row-ico">🧠</span><span class="row-name">Market research must check official sources</span><span class="row-badge b-feedback">feedback</span><span class="row-desc">Exhaustively search for official solutions first</span><span class="row-meta">1.1K</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+        <div class="item-row" data-t="memory"><span class="row-ico">🧠</span><span class="row-name">Use neutral professional framing</span><span class="row-badge b-feedback">feedback</span><span class="row-desc">Claude output uses professional terminology</span><span class="row-meta">2.4K</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+        <div class="item-row" data-t="memory"><span class="row-ico">🧠</span><span class="row-name">Always source nvm before node/npx</span><span class="row-badge b-feedback">feedback</span><span class="row-desc">Running npx without nvm.sh can break nvm default</span><span class="row-meta">980B</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+        <div class="item-row" data-t="memory"><span class="row-ico">🧠</span><span class="row-name">Use personal SSH key for MyGithub pushes</span><span class="row-badge b-feedback">feedback</span><span class="row-desc">Switch gh to ithiria894, use github.com-personal</span><span class="row-meta">872B</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+        <div class="item-row" data-t="memory"><span class="row-ico">🧠</span><span class="row-name">Always update C facts folder</span><span class="row-badge b-feedback">feedback</span><span class="row-desc">Update ~/MyGithub/C/ when user shares C info</span><span class="row-meta">705B</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+        <div class="item-row" data-t="memory"><span class="row-ico">🧠</span><span class="row-name">Side hustle docs structure</span><span class="row-badge b-project">project</span><span class="row-desc">OVERVIEW.md → 1-think/2-build/3-ship/4-grow</span><span class="row-meta">1.2K</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+        <div class="item-row" data-t="memory"><span class="row-ico">🧠</span><span class="row-name">npm publish setup</span><span class="row-badge b-reference">reference</span><span class="row-desc">npm account ithiria, orgs @mcpware @agents-io</span><span class="row-meta">881B</span><span class="row-acts"><button class="rbtn" onclick="ev(event);om()">Move</button><button class="rbtn" onclick="ev(event)">Open</button></span></div>
+      </div></div>
+    </div>
+  </div>
+
+  <!-- ═══ DOCUMENTS ═══ -->
+  <div class="scope-block"><div class="scope-hdr" onclick="togS(this)"><span class="scope-tog c">▼</span><span class="scope-ico">📂</span><span class="scope-nm">Documents</span><span class="scope-tag tag-project">project</span><span class="scope-cnt">1</span></div><div class="scope-body c"></div></div>
+
+  </div><!-- end projects wrapper -->
+</div>
+
+<!-- Detail panel -->
+<div class="detail hidden" id="dp">
+  <div class="detail-hdr"><h2 id="dt">—</h2><button class="detail-x" onclick="cd()">&times;</button></div>
+  <div class="detail-bd">
+    <div class="df"><div class="dl">Type</div><div class="dv" id="dty">—</div></div>
+    <div class="df"><div class="dl">Scope</div><div class="dv" id="dsc">—</div></div>
+    <div class="df"><div class="dl">Description</div><div class="dv" id="dde">—</div></div>
+    <div class="df"><div class="dl">Size</div><div class="dv" id="dsz">—</div></div>
+    <div class="df"><div class="dl">Modified</div><div class="dv" id="dda">—</div></div>
+  </div>
+  <div class="detail-ft"><button class="btn btn-p">Open in Editor</button><button class="btn btn-s" onclick="om()">Move to...</button></div>
+</div>
+</div>
+
+<!-- Drag confirm -->
+<div class="modal-bg hidden" id="dragConfirm">
+  <div class="modal">
+    <h3>Confirm Move</h3>
+    <div class="modal-sub">This will move the file in your Claude config</div>
+    <div class="move-preview">
+      <div>Move <span class="move-item" id="dc-item">—</span></div>
+      <div style="margin-top:8px">From: <span class="move-from" id="dc-from">—</span></div>
+      <div>To: <span class="move-to" id="dc-to">—</span></div>
+    </div>
+    <div class="modal-btns"><button class="btn btn-s" onclick="cancelDrag()">Cancel</button><button class="btn btn-p" onclick="confirmDrag()">Yes, move it</button></div>
+  </div>
+</div>
+
+<!-- Move-to picker -->
+<div class="modal-bg hidden" id="mm" onclick="if(event.target===this)cm()">
+  <div class="modal">
+    <h3>Move to...</h3>
+    <div class="modal-sub">Select destination scope</div>
+    <div class="modal-body">
+      <div class="dest" onclick="sld(this)"><span class="di">🌐</span><span class="dn">Global</span><span class="dp">applies everywhere</span></div>
+      <div class="dest" onclick="sld(this)"><span class="di">📂</span><span class="dn">AlltrueAi</span><span class="dp">workspace</span></div>
+      <div class="dest" onclick="sld(this)" style="padding-left:36px"><span class="di">📂</span><span class="dn">ai-security-control-plane</span></div>
+      <div class="dest" onclick="sld(this)" style="padding-left:36px"><span class="di">📂</span><span class="dn">ai-security-ui</span></div>
+      <div class="dest" onclick="sld(this)" style="padding-left:36px"><span class="di">📂</span><span class="dn">rule-processor</span></div>
+      <div class="dest" onclick="sld(this)"><span class="di">📂</span><span class="dn">MyGithub</span></div>
+      <div class="dest" onclick="sld(this)"><span class="di">📂</span><span class="dn">Documents</span></div>
+    </div>
+    <div class="modal-btns"><button class="btn btn-s" onclick="cm()">Cancel</button><button class="btn btn-p" id="cmb" onclick="dm()" disabled>Move here</button></div>
+  </div>
+</div>
+
+<div class="toast hidden" id="tt"><span id="tm">Done</span></div>
+
+<script>
+function ev(e){e.stopPropagation()}
+function togS(h){const b=h.closest('.scope-block').querySelector(':scope>.scope-body');const t=h.querySelector('.scope-tog');b.classList.toggle('c');t.classList.toggle('c')}
+function togC(r){const b=r.nextElementSibling;const t=r.querySelector('.cat-tog');b.classList.toggle('c');t.classList.toggle('c')}
+function sd(el,n,d,t,s,sz,dt){document.getElementById('dp').classList.remove('hidden');document.getElementById('dt').textContent=n;document.getElementById('dty').innerHTML='<span class="row-badge b-'+t+'">'+t+'</span>';document.getElementById('dsc').textContent=s;document.getElementById('dde').textContent=d;document.getElementById('dsz').textContent=sz;document.getElementById('dda').textContent=dt;document.querySelectorAll('.item-row.selected').forEach(c=>c.classList.remove('selected'));el.classList.add('selected')}
+function cd(){document.getElementById('dp').classList.add('hidden');document.querySelectorAll('.item-row.selected').forEach(c=>c.classList.remove('selected'))}
+function om(){document.getElementById('mm').classList.remove('hidden')}
+function cm(){document.getElementById('mm').classList.add('hidden');document.querySelectorAll('.dest').forEach(d=>d.classList.remove('sel'));document.getElementById('cmb').disabled=true}
+function sld(el){document.querySelectorAll('.dest').forEach(d=>d.classList.remove('sel'));el.classList.add('sel');document.getElementById('cmb').disabled=false}
+function dm(){cm();toast('Moved successfully!')}
+let pendingDrag=null;
+function showDragConfirm(n,f,t,rv){pendingDrag={rv};document.getElementById('dc-item').textContent=n;document.getElementById('dc-from').textContent=f;document.getElementById('dc-to').textContent=t;document.getElementById('dragConfirm').classList.remove('hidden')}
+function confirmDrag(){document.getElementById('dragConfirm').classList.add('hidden');toast('Moved "'+document.getElementById('dc-item').textContent+'" → '+document.getElementById('dc-to').textContent);pendingDrag=null}
+function cancelDrag(){document.getElementById('dragConfirm').classList.add('hidden');if(pendingDrag&&pendingDrag.rv)pendingDrag.rv();pendingDrag=null}
+function toast(m){const t=document.getElementById('tt');document.getElementById('tm').textContent=m;t.classList.remove('hidden');setTimeout(()=>t.classList.add('hidden'),3000)}
+function filterAll(el){document.querySelectorAll('.pill').forEach(p=>p.classList.remove('active'));el.classList.add('active');document.querySelectorAll('.cat-hdr,.cat-body').forEach(s=>s.style.display='')}
+function ft(type,el){document.querySelectorAll('.pill').forEach(p=>p.classList.remove('active'));el.classList.add('active');document.querySelectorAll('.cat-hdr').forEach(r=>{r.style.display=r.dataset.cat===type?'':'none'});document.querySelectorAll('.cat-body').forEach(b=>{b.style.display=b.dataset.cat===type?'':'none'})}
+document.getElementById('si').addEventListener('input',function(){const q=this.value.toLowerCase();document.querySelectorAll('.item-row').forEach(c=>{c.style.display=(!q||c.textContent.toLowerCase().includes(q))?'':'none'})});
+document.querySelectorAll('.sortable-zone').forEach(el=>{
+  const grp=el.dataset.group||'none';
+  Sortable.create(el,{group:grp,animation:150,ghostClass:'sortable-ghost',chosenClass:'sortable-chosen',draggable:'.item-row:not(.locked)',fallbackOnBody:true,scroll:true,scrollSensitivity:60,
+    onEnd(evt){if(evt.from!==evt.to){const item=evt.item;const name=item.querySelector('.row-name')?.textContent||'item';const fromScope=evt.from.dataset.scope||'?';const toScope=evt.to.dataset.scope||'?';const oldParent=evt.from;const oldIndex=evt.oldIndex;const rv=()=>{if(oldIndex>=oldParent.children.length)oldParent.appendChild(item);else oldParent.insertBefore(item,oldParent.children[oldIndex])};showDragConfirm(name,fromScope,toScope,rv)}}
+  });
+});
+</script>
+</body>
+</html>
