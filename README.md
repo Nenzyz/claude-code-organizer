@@ -2,9 +2,27 @@
 
 **Organize all your Claude Code memories, skills, MCP servers, and hooks — view by scope hierarchy, move between scopes via drag-and-drop.**
 
-Claude Code saves your customizations across scattered directories with encoded paths. This tool gives you a visual dashboard to see everything, understand which scope each item applies to, and move items between scopes with one click.
-
 ![Claude Code Organizer Dashboard](docs/dashboard.png)
+
+## The Problem
+
+Ever asked Claude Code to "remember this", only to find it saved the memory to the wrong scope?
+
+You're inside a project folder, you tell Claude to remember a preference — and it saves it to that project's scope. Switch to another project, and Claude has no idea. That memory is trapped.
+
+The reverse happens too — skills or memories sitting in global scope that really only apply to one repo, leaking into everything else.
+
+Want to fix it? You'd have to manually dig through `~/.claude/` and its encoded-path folders (`-home-user-projects-my-app/`), find the right file, and move it yourself.
+
+**Claude Code Organizer fixes this.**
+
+### Example: Project → Global
+
+You told Claude to remember "I prefer TypeScript + ESM" while inside a project, but that preference applies everywhere. Open the dashboard, drag that memory from Project scope to Global scope. Done.
+
+### Example: Global → Project
+
+You have a deploy skill sitting in global, but it only makes sense for one repo. Drag it into that Project scope — other projects won't see it anymore.
 
 ---
 
@@ -29,6 +47,10 @@ npx @mcpware/claude-code-organizer
 npm install -g @mcpware/claude-code-organizer
 claude-code-organizer
 ```
+
+Or paste this into Claude Code:
+
+> Run `npx @mcpware/claude-code-organizer` — it's a dashboard for managing Claude Code settings. Tell me the URL when it's ready.
 
 Opens a dashboard at `http://localhost:3847`. Works with your real `~/.claude/` directory.
 
