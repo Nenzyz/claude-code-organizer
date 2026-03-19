@@ -69,12 +69,12 @@ Opens a dashboard at `http://localhost:3847`. Works with your real `~/.claude/` 
 ## Scope Hierarchy
 
 ```
-Global                          <- applies everywhere
-  AlltrueAi (workspace)         <- applies to all sub-projects
-    ai-security-control-plane   <- project-specific
-    rule-processor              <- project-specific
-  MyGithub (project)            <- independent project
-  Documents (project)           <- independent project
+Global                       <- applies everywhere
+  Company (workspace)        <- applies to all sub-projects
+    CompanyRepo1             <- project-specific
+    CompanyRepo2             <- project-specific
+  SideProjects (project)     <- independent project
+  Documents (project)        <- independent project
 ```
 
 Child scopes inherit parent scope's memories, skills, and MCP servers.
@@ -142,6 +142,6 @@ MIT
 
 ## Author
 
-[mcpware](https://github.com/mcpware) — Building tools for the Claude Code ecosystem.
+[ithiria894](https://github.com/ithiria894) — Building tools for the Claude Code ecosystem.
 
 See also: [@mcpware/instagram-mcp](https://github.com/mcpware/instagram-mcp)

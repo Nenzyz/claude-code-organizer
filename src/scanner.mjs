@@ -49,7 +49,7 @@ function parseFrontmatter(content) {
 
 /**
  * Resolve an encoded project dir name back to a real filesystem path.
- * E.g. "-home-nicole-AlltrueAi-ai-security-control-plane" → "/home/nicole/AlltrueAi/ai-security-control-plane"
+ * E.g. "-home-user-mycompany-repo1" → "/home/user/mycompany/repo1"
  *
  * Strategy: starting from root, greedily match the longest existing directory
  * at each level by consuming segments from the encoded name.
@@ -120,7 +120,7 @@ async function discoverScopes() {
 
     // Decode encoded path: try to find the real directory on disk.
     // The encoding replaces / with - and prepends -.
-    // E.g. -home-nicole-AlltrueAi-ai-security-control-plane → /home/nicole/AlltrueAi/ai-security-control-plane
+    // E.g. -home-user-mycompany-repo1 → /home/user/mycompany/repo1
     // Since directory names can contain dashes, we resolve by checking which real path exists.
     const realPath = await resolveEncodedProjectPath(d.name);
     if (!realPath) continue;

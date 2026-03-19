@@ -92,11 +92,11 @@ Any Claude Code power user who has accumulated enough memories, skills, and conf
 
 ```
 🌐 Global                         ← applies everywhere
-  ↳ 📂 AlltrueAi (workspace)      ← applies when cd ~/AlltrueAi/*
-      ↳ 📂 ai-security-control-plane (project)
-      ↳ 📂 ai-security-ui (project)
-      ↳ 📂 rule-processor (project)
-  ↳ 📂 MyGithub (project)         ← applies when cd ~/MyGithub
+  ↳ 📂 Company (workspace)        ← applies when cd ~/Company/*
+      ↳ 📂 CompanyRepo1 (project)
+      ↳ 📂 CompanyRepo2 (project)
+      ↳ 📂 CompanyRepo3 (project)
+  ↳ 📂 SideProjects (project)     ← applies when cd ~/SideProjects
   ↳ 📂 Documents (project)        ← applies when cd ~/Documents
 ```
 
@@ -202,7 +202,7 @@ See `mockup.html` — interactive prototype with:
 - Drag confirmation modal
 - Detail panel on click
 - Search and filter pills
-- Scope inheritance indicators (`↳ Inherits 🌐 Global 📂 AlltrueAi`)
+- Scope inheritance indicators (`↳ Inherits 🌐 Global 📂 Company`)
 
 ### Color Palette
 ```
