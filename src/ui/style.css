@@ -88,7 +88,7 @@ body {
 .tag-global { background:var(--tag-global-bg); color:var(--tag-global-text); }
 .tag-workspace { background:var(--tag-workspace-bg); color:var(--tag-workspace-text); }
 .tag-project { background:var(--tag-project-bg); color:var(--tag-project-text); }
-.scope-info { font-size:0.65rem; color:var(--text-muted); margin-left:auto; }
+.scope-info { font-size:0.65rem; color:var(--text-muted); margin-left:auto; flex-shrink:0; }
 .scope-cnt { background:var(--accent-light); color:var(--accent-text); border-radius:10px; padding:2px 9px; font-size:0.62rem; font-weight:700; }
 
 .scope-body { padding:0 0 6px; }
@@ -102,12 +102,11 @@ body {
   transition:all 0.12s;
 }
 
-.inherit {
-  font-size:0.68rem; color:var(--accent-text); padding:6px 14px 10px 40px;
-  font-weight:500; display:flex; align-items:center; gap:6px; flex-wrap:wrap;
+.scope-inherit {
+  display:flex; align-items:center; gap:4px; cursor:default;
 }
-.inherit-pill { background:var(--accent-light); color:var(--accent-text); padding:2px 8px; border-radius:4px; font-size:0.6rem; font-weight:600; }
-.inherit-arrow { color:var(--accent); font-size:0.8rem; }
+.inherit-pill { background:var(--accent-light); color:var(--accent-text); padding:1px 6px; border-radius:4px; font-size:0.55rem; font-weight:600; }
+.inherit-arrow { color:var(--text-faint); font-size:0.65rem; }
 
 /* ══════════════════════════════════════
    CATEGORY BAR — Medium prominence

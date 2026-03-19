@@ -144,7 +144,7 @@ function renderScope(scope, depth) {
   const icon = SCOPE_ICONS[scope.type] || "📂";
   const tagClass = `tag-${scope.type}`;
 
-  // Build inheritance pills
+  // Build inheritance pills (inline in header)
   let inheritHtml = "";
   if (scope.parentId) {
     const chain = getScopeChain(scope);
@@ -152,7 +152,7 @@ function renderScope(scope, depth) {
       const pills = chain.map(s =>
         `<span class="inherit-pill">${SCOPE_ICONS[s.type] || "📂"} ${esc(s.name)}</span>`
       ).join(" ");
-      inheritHtml = `<div class="inherit"><span class="inherit-arrow">↳</span> Inherits ${pills}</div>`;
+      inheritHtml = `<span class="scope-inherit" title="Inherits from ${chain.map(s => s.name).join(' → ')}"><span class="inherit-arrow">↳</span> ${pills}</span>`;
     }
   }
 
@@ -183,11 +183,11 @@ function renderScope(scope, depth) {
         <span class="scope-ico">${icon}</span>
         <span class="scope-nm">${esc(scope.name)}</span>
         <span class="scope-tag ${tagClass}">${esc(scope.tag)}</span>
+        ${inheritHtml}
         <span class="scope-info">${esc(subInfo)}</span>
         <span class="scope-cnt">${totalCount}</span>
       </div>
-      <div class="scope-body">
-        ${inheritHtml}`;
+      <div class="scope-body">`;
 
   // Render each category
   for (const [cat, catItems] of Object.entries(categories)) {
