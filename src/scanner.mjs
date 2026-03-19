@@ -175,6 +175,44 @@ async function discoverScopes() {
   return scopes;
 }
 
+// ── Skill bundle detection (via skills-lock.json) ───────────────────
+
+/**
+ * Load skill bundle info from skills-lock.json files.
+ * Returns a Map of skillName → { source, sourceType }.
+ *
+ * Checks:
+ * 1. Project-level: <repoDir>/skills-lock.json (version 1)
+ * 2. Global: ~/.agents/.skill-lock.json (version 3)
+ */
+async function loadSkillBundles(repoDir) {
+  const bundles = new Map();
+
+  // Paths to check (project-level first, then global)
+  const lockPaths = [];
+  if (repoDir) lockPaths.push(join(repoDir, "skills-lock.json"));
+  lockPaths.push(join(HOME, ".agents", ".skill-lock.json"));
+
+  for (const lockPath of lockPaths) {
+    const content = await safeReadFile(lockPath);
+    if (!content) continue;
+    try {
+      const lock = JSON.parse(content);
+      const skills = lock.skills || {};
+      for (const [name, entry] of Object.entries(skills)) {
+        if (!bundles.has(name) && entry.source) {
+          bundles.set(name, {
+            source: entry.source,
+            sourceType: entry.sourceType || "unknown",
+          });
+        }
+      }
+    } catch {}
+  }
+
+  return bundles;
+}
+
 // ── Item scanners ────────────────────────────────────────────────────
 
 async function scanMemories(scope) {
@@ -224,10 +262,14 @@ async function scanSkills(scope) {
     if (await exists(dir)) skillDirs.push(dir);
   }
 
+  // Load bundle info from skills-lock.json
+  const bundleMap = await loadSkillBundles(scope.repoDir);
+
   for (const skillsRoot of skillDirs) {
     const entries = await readdir(skillsRoot, { withFileTypes: true });
     for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
+      // Support both real directories and symlinks pointing to directories
+      if (!entry.isDirectory() && !entry.isSymbolicLink()) continue;
       // Skip "private" directory (usually copies of global skills)
       if (entry.name === "private") continue;
 
@@ -268,6 +310,9 @@ async function scanSkills(scope) {
         if (fs) totalSize += fs.size;
       }
 
+      // Bundle detection from skills-lock.json
+      const bundleInfo = bundleMap.get(entry.name);
+
       items.push({
         category: "skill",
         scopeId: scope.id,
@@ -280,6 +325,7 @@ async function scanSkills(scope) {
         fileCount,
         mtime: s ? s.mtime.toISOString().slice(0, 10) : "",
         path: skillDir,
+        bundle: bundleInfo?.source || null,
       });
     }
   }

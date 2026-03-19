@@ -192,7 +192,61 @@ function renderScope(scope, depth) {
   // Render each category
   for (const [cat, catItems] of Object.entries(categories)) {
     const catConfig = CATEGORIES[cat] || { icon: "📄", label: cat.toUpperCase(), group: null };
-    html += `
+
+    // Skills: group by bundle if any items have bundle info
+    if (cat === "skill") {
+      const bundled = {};   // source → items[]
+      const unbundled = []; // items without bundle
+      for (const item of catItems) {
+        if (item.bundle) {
+          (bundled[item.bundle] ??= []).push(item);
+        } else {
+          unbundled.push(item);
+        }
+      }
+
+      const hasBundles = Object.keys(bundled).length > 0;
+
+      html += `
+        <div class="cat-hdr" data-cat="${esc(cat)}">
+          <span class="cat-tog">▼</span>
+          <span class="cat-ico">${catConfig.icon}</span>
+          <span class="cat-nm">${catConfig.label}</span>
+          <span class="cat-cnt">${catItems.length}</span>
+        </div>
+        <div class="cat-body" data-cat="${esc(cat)}">`;
+
+      // Render each bundle as a collapsible sub-group
+      for (const [source, bundleItems] of Object.entries(bundled)) {
+        const bundleName = source.split("/").pop(); // "pbakaus/impeccable" → "impeccable"
+        const bundleLabel = source; // full "owner/repo"
+        html += `
+          <div class="bundle-hdr" data-bundle="${esc(source)}">
+            <span class="bundle-tog">▼</span>
+            <span class="bundle-ico">📦</span>
+            <span class="bundle-nm">${esc(bundleName)}</span>
+            <span class="bundle-src">${esc(bundleLabel)}</span>
+            <span class="bundle-cnt">${bundleItems.length}</span>
+          </div>
+          <div class="bundle-body" data-bundle="${esc(source)}">
+            <div class="sortable-zone" data-scope="${esc(scope.id)}" data-group="${catConfig.group || 'none'}">
+              ${bundleItems.map(item => renderItem(item)).join("")}
+            </div>
+          </div>`;
+      }
+
+      // Render unbundled skills flat (no group header)
+      if (unbundled.length > 0) {
+        html += `
+          <div class="sortable-zone" data-scope="${esc(scope.id)}" data-group="${catConfig.group || 'none'}">
+            ${unbundled.map(item => renderItem(item)).join("")}
+          </div>`;
+      }
+
+      html += `</div>`;
+    } else {
+      // Non-skill categories: render flat as before
+      html += `
         <div class="cat-hdr" data-cat="${esc(cat)}">
           <span class="cat-tog">▼</span>
           <span class="cat-ico">${catConfig.icon}</span>
@@ -204,6 +258,7 @@ function renderScope(scope, depth) {
             ${catItems.map(item => renderItem(item)).join("")}
           </div>
         </div>`;
+    }
   }
 
   // Render child scopes
@@ -279,6 +334,15 @@ function saveExpandState() {
     const catKey = `${scopeId}::${hdr.dataset.cat}`;
     if (body && !body.classList.contains("c")) {
       expandState.cats.add(catKey);
+    }
+  });
+  // Save bundle expand state
+  document.querySelectorAll(".bundle-hdr").forEach(hdr => {
+    const body = hdr.nextElementSibling;
+    const scopeId = hdr.closest(".scope-block")?.querySelector(".scope-hdr")?.dataset.scopeId || "";
+    const bundleKey = `${scopeId}::bundle::${hdr.dataset.bundle}`;
+    if (body && !body.classList.contains("c")) {
+      expandState.cats.add(bundleKey);
     }
   });
 }
@@ -379,6 +443,24 @@ function initSortable() {
     hdr.addEventListener("click", () => {
       const body = hdr.nextElementSibling;
       const tog = hdr.querySelector(".cat-tog");
+      body.classList.toggle("c");
+      tog.classList.toggle("c");
+    });
+  });
+
+  // Bundle toggle — default collapsed
+  document.querySelectorAll(".bundle-hdr").forEach(hdr => {
+    const body = hdr.nextElementSibling;
+    const tog = hdr.querySelector(".bundle-tog");
+    // Default collapsed
+    const scopeId = hdr.closest(".scope-block")?.querySelector(".scope-hdr")?.dataset.scopeId || "";
+    const bundleKey = `${scopeId}::bundle::${hdr.dataset.bundle}`;
+    if (!expandState.cats.has(bundleKey)) {
+      body?.classList.add("c");
+      tog?.classList.add("c");
+    }
+    hdr.addEventListener("click", (e) => {
+      e.stopPropagation();
       body.classList.toggle("c");
       tog.classList.toggle("c");
     });
@@ -633,6 +715,19 @@ function setupExpandToggle() {
         tog?.classList.add("c");
       }
     });
+
+    // Also expand/collapse bundles
+    document.querySelectorAll(".bundle-hdr").forEach(hdr => {
+      const body = hdr.nextElementSibling;
+      const tog = hdr.querySelector(".bundle-tog");
+      if (allExpanded) {
+        body?.classList.remove("c");
+        tog?.classList.remove("c");
+      } else {
+        body?.classList.add("c");
+        tog?.classList.add("c");
+      }
+    });
   });
 }
 
@@ -670,7 +765,22 @@ function setupSearch() {
       row.style.display = (!q || text.includes(q)) ? "" : "none";
     });
 
-    // 2. Hide category sections where all items are hidden
+    // 2a. Hide bundle groups where all items are hidden
+    document.querySelectorAll(".bundle-hdr").forEach(bundleHdr => {
+      const bundleBody = bundleHdr.nextElementSibling;
+      if (!bundleBody) return;
+      const rows = bundleBody.querySelectorAll(".item-row");
+      const anyVisible = rows.length === 0 || [...rows].some(r => r.style.display !== "none");
+      bundleHdr.style.display = anyVisible ? "" : "none";
+      bundleBody.style.display = anyVisible ? "" : "none";
+      // When searching, auto-expand visible bundles
+      if (q && anyVisible) {
+        bundleBody.classList.remove("c");
+        bundleHdr.querySelector(".bundle-tog")?.classList.remove("c");
+      }
+    });
+
+    // 2b. Hide category sections where all items are hidden
     document.querySelectorAll(".cat-hdr").forEach(catHdr => {
       const catBody = catHdr.nextElementSibling;
       if (!catBody) return;

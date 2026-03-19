@@ -129,6 +129,25 @@ body {
 .cat-body.c { display:none; }
 
 /* ══════════════════════════════════════
+   BUNDLE SUB-GROUP — Inside skill category
+   ══════════════════════════════════════ */
+.bundle-hdr {
+  display:flex; align-items:center; gap:8px;
+  padding:6px 12px; margin:3px 0 2px 64px; cursor:pointer;
+  background:var(--surface); border:1px solid var(--border-light);
+  border-radius:7px; user-select:none; transition:all 0.15s;
+}
+.bundle-hdr:hover { background:var(--hover); border-color:var(--border); }
+.bundle-tog { width:12px; text-align:center; color:var(--text-faint); font-size:0.55rem; transition:transform 0.15s; flex-shrink:0; }
+.bundle-tog.c { transform:rotate(-90deg); }
+.bundle-ico { font-size:0.75rem; }
+.bundle-nm { font-size:0.68rem; color:var(--text-secondary); font-weight:600; }
+.bundle-src { font-size:0.58rem; color:var(--text-faint); font-family:'SF Mono','Cascadia Code','Fira Code','Courier New',monospace; }
+.bundle-cnt { font-size:0.58rem; color:var(--text-muted); margin-left:auto; font-weight:500; }
+.bundle-body { padding:0; }
+.bundle-body.c { display:none; }
+
+/* ══════════════════════════════════════
    ITEM ROW — Least prominent
    ══════════════════════════════════════ */
 .sortable-zone { min-height:4px; margin-left:64px; padding:2px 0; }
