@@ -2,7 +2,11 @@
 
 **管理你所有的 Claude Code 記憶、技能、MCP 伺服器和鉤子 — 按作用域層級查看，透過拖放在作用域之間移動。**
 
-[English](README.md) | [简体中文](README.zh-CN.md) | 繁體中文
+[![npm version](https://img.shields.io/npm/v/@mcpware/claude-code-organizer)](https://www.npmjs.com/package/@mcpware/claude-code-organizer)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](https://nodejs.org)
+
+[English](README.md) | [简体中文](README.zh-CN.md) | 繁體中文 | [日本語](README.ja.md) | [한국어](README.ko.md)
 
 ![Claude Code Organizer Demo](docs/demo.gif)
 
