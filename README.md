@@ -4,6 +4,8 @@
 
 Claude Code saves your customizations across scattered directories with encoded paths. This tool gives you a visual dashboard to see everything, understand which scope each item applies to, and move items between scopes with one click.
 
+![Claude Code Organizer Dashboard](docs/dashboard.png)
+
 ---
 
 ## Features

@@ -1,0 +1,8 @@
+.mcpregistry_github_token
+.mcpregistry_registry_token
+mcp-publisher
+*.tgz
+PLAN.md
+SHIP.md
+mockup.html
+docs/
