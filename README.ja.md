@@ -60,29 +60,20 @@ Claude Code は CLI でファイルの一覧表示や移動ができる。じゃ
 
 ## クイックスタート
 
-### 方法1：Claude Code プラグイン（おすすめ）
-
-```bash
-# プラグインとしてインストール — /organize スラッシュコマンドが追加される
-/plugin install claude-code-organizer
-```
-
-あとは Claude Code で `/organize` と入力するだけでダッシュボードが起動。
-
-### 方法2：npx（インストール不要）
+### 方法1：npx（インストール不要）
 
 ```bash
 npx @mcpware/claude-code-organizer
 ```
 
-### 方法3：グローバルインストール
+### 方法2：グローバルインストール
 
 ```bash
 npm install -g @mcpware/claude-code-organizer
 claude-code-organizer
 ```
 
-### 方法4：Claude に頼む
+### 方法3：Claude に頼む
 
 Claude Code にこう伝えるだけ：
 

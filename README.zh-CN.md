@@ -60,29 +60,20 @@ Claude Code 用 CLI 就能列出和移动文件。那为什么还要这个工具
 
 ## 快速上手
 
-### 方式1：Claude Code 插件（推荐）
-
-```bash
-# 作为插件安装 — 自动添加 /organize 命令
-/plugin install claude-code-organizer
-```
-
-之后在 Claude Code 里输入 `/organize` 就能打开仪表盘。
-
-### 方式2：npx（免安装）
+### 方式1：npx（免安装）
 
 ```bash
 npx @mcpware/claude-code-organizer
 ```
 
-### 方式3：全局安装
+### 方式2：全局安装
 
 ```bash
 npm install -g @mcpware/claude-code-organizer
 claude-code-organizer
 ```
 
-### 方式4：让 Claude 帮你跑
+### 方式3：让 Claude 帮你跑
 
 直接把这段话丢给 Claude Code：
 
