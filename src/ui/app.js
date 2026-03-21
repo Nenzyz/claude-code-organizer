@@ -290,7 +290,7 @@ function renderItem(item) {
     </span>`;
 
   return `
-    <div class="item-row${locked}" data-path="${esc(item.path)}" data-category="${item.category}">
+    <div class="item-row${locked}" data-path="${esc(item.path)}" data-category="${item.category}" data-name="${esc(item.name)}">
       ${checkbox}
       <span class="row-ico">${icon}</span>
       <span class="row-name">${esc(item.name)}</span>
@@ -466,12 +466,21 @@ function initSortable() {
     });
   });
 
+  // Helper: find item from row using path + category + name (handles items sharing same path, e.g. hooks vs config)
+  function findItemFromRow(row) {
+    const path = row.dataset.path;
+    const category = row.dataset.category;
+    const name = row.dataset.name;
+    return data.items.find(i => i.path === path && i.category === category && i.name === name)
+      || data.items.find(i => i.path === path && i.category === category)
+      || data.items.find(i => i.path === path);
+  }
+
   // Item click → detail panel
   document.querySelectorAll(".item-row").forEach(row => {
     row.addEventListener("click", (e) => {
       if (e.target.closest(".rbtn")) return;
-      const path = row.dataset.path;
-      const item = data.items.find(i => i.path === path);
+      const item = findItemFromRow(row);
       if (item) showDetail(item, row);
     });
   });
@@ -481,8 +490,7 @@ function initSortable() {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
       const row = btn.closest(".item-row");
-      const path = row.dataset.path;
-      const item = data.items.find(i => i.path === path);
+      const item = findItemFromRow(row);
       if (!item) return;
 
       if (btn.dataset.action === "move") {
@@ -557,6 +565,13 @@ function setupBulkBar() {
     const categories = new Set(items.map(i => i.category));
     if (categories.size > 1) {
       return toast("Cannot bulk-move items of different types", true);
+    }
+
+    // Only memory, skill, mcp can be moved
+    const movableCategories = new Set(["memory", "skill", "mcp"]);
+    const nonMovable = items.filter(i => !movableCategories.has(i.category));
+    if (nonMovable.length > 0) {
+      return toast(`${nonMovable[0].category} items cannot be moved`, true);
     }
 
     // Use first item to get destinations, then move all
@@ -863,9 +878,24 @@ async function loadPreview(item) {
       return;
     }
 
-    // Hook: show command/prompt inline
+    // Hook: show full hook config from settings file
     if (item.category === "hook") {
-      el.textContent = item.description || "(no content)";
+      try {
+        const res = await fetchJson(`/api/file-content?path=${encodeURIComponent(item.path)}`);
+        if (res.ok) {
+          const settings = JSON.parse(res.content);
+          const hookConfig = settings.hooks?.[item.name];
+          if (hookConfig) {
+            el.textContent = JSON.stringify(hookConfig, null, 2);
+          } else {
+            el.textContent = item.description || "(no content)";
+          }
+        } else {
+          el.textContent = item.description || "(no content)";
+        }
+      } catch {
+        el.textContent = item.description || "(no content)";
+      }
       return;
     }
 
@@ -1006,7 +1036,7 @@ function setupModals() {
 }
 
 async function openMoveModal(item) {
-  const res = await fetchJson(`/api/destinations?path=${encodeURIComponent(item.path)}`);
+  const res = await fetchJson(`/api/destinations?path=${encodeURIComponent(item.path)}&category=${encodeURIComponent(item.category)}&name=${encodeURIComponent(item.name)}`);
   if (!res.ok) return toast(res.error, true);
 
   const listEl = document.getElementById("moveDestList");

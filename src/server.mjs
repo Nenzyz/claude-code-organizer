@@ -100,11 +100,18 @@ async function handleRequest(req, res) {
     return json(res, result, result.ok ? 200 : 400);
   }
 
-  // GET /api/destinations?path=...&category=... — valid move destinations
+  // GET /api/destinations?path=...&category=...&name=... — valid move destinations
   if (path === "/api/destinations" && req.method === "GET") {
     if (!cachedData) await freshScan();
     const itemPath = url.searchParams.get("path");
-    const item = cachedData.items.find(i => i.path === itemPath);
+    const category = url.searchParams.get("category");
+    const name = url.searchParams.get("name");
+    // Match by path + category + name to disambiguate items sharing the same path (e.g. hooks vs config in settings.json)
+    const item = cachedData.items.find(i =>
+      i.path === itemPath &&
+      (!category || i.category === category) &&
+      (!name || i.name === name)
+    );
     if (!item) return json(res, { ok: false, error: "Item not found" }, 400);
 
     const destinations = getValidDestinations(item, cachedData.scopes);
