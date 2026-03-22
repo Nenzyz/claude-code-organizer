@@ -1,13 +1,14 @@
 {
   "name": "@mcpware/claude-code-organizer",
-  "version": "0.2.8",
+  "version": "0.3.0",
   "description": "Organize all your Claude Code memories, skills, MCP servers, and hooks — view by scope hierarchy, move between scopes via drag-and-drop",
   "type": "module",
   "bin": {
     "claude-code-organizer": "./bin/cli.mjs"
   },
   "scripts": {
-    "start": "node bin/cli.mjs"
+    "start": "node bin/cli.mjs",
+    "mcp": "node src/mcp-server.mjs"
   },
   "keywords": [
     "claude-code",
@@ -36,5 +37,7 @@
   "engines": {
     "node": ">=20"
   },
-  "dependencies": {}
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1"
+  }
 }
