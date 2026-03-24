@@ -1,17 +1,17 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.mcpware/claude-code-organizer",
-  "description": "Organize Claude Code memories, skills, MCP servers, commands, agents, rules, and hooks via drag-and-drop dashboard.",
+  "description": "Organize all Claude Code configs — memories, skills, MCP, commands, agents, rules — via drag-and-drop.",
   "repository": {
     "url": "https://github.com/mcpware/claude-code-organizer",
     "source": "github"
   },
-  "version": "0.5.2",
+  "version": "0.5.3",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@mcpware/claude-code-organizer",
-      "version": "0.5.2",
+      "version": "0.5.3",
       "transport": {
         "type": "stdio"
       }
