@@ -1,5 +1,5 @@
 /**
- * server.mjs — HTTP server for Claude Inventory Manager.
+ * server.mjs — HTTP server for Claude Code Organizer.
  * Routes only. All logic is in scanner.mjs and mover.mjs.
  * All UI is in src/ui/ (html, css, js).
  */

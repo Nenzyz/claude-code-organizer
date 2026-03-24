@@ -1,6 +1,6 @@
 {
   "name": "@mcpware/claude-code-organizer",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Organize all your Claude Code memories, skills, MCP servers, and hooks — view by scope hierarchy, move between scopes via drag-and-drop",
   "type": "module",
   "bin": {
@@ -8,7 +8,9 @@
   },
   "scripts": {
     "start": "node bin/cli.mjs",
-    "mcp": "node src/mcp-server.mjs"
+    "mcp": "node src/mcp-server.mjs",
+    "test": "npx playwright test --config tests/e2e/playwright.config.mjs",
+    "test:headed": "npx playwright test --config tests/e2e/playwright.config.mjs --headed"
   },
   "keywords": [
     "claude-code",
@@ -39,5 +41,8 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2"
   }
 }

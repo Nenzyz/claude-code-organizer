@@ -1,5 +1,5 @@
 /**
- * app.js — Frontend logic for Claude Inventory Manager.
+ * app.js — Frontend logic for Claude Code Organizer.
  *
  * Fetches data from /api/scan, renders the scope tree,
  * handles drag-and-drop (SortableJS), search, filter, detail panel.
@@ -581,13 +581,19 @@ function setupBulkBar() {
 
 async function openBulkMoveModal(items) {
   const first = items[0];
-  const res = await fetchJson(`/api/destinations?path=${encodeURIComponent(first.path)}`);
+  const res = await fetchJson(`/api/destinations?path=${encodeURIComponent(first.path)}&category=${encodeURIComponent(first.category)}&name=${encodeURIComponent(first.name)}`);
   if (!res.ok) return toast(res.error, true);
 
   const listEl = document.getElementById("moveDestList");
+  // Include current scope (grayed out) so tree hierarchy builds correctly
+  const currentScope = data.scopes.find(s => s.id === res.currentScopeId);
+  const allScopes = currentScope
+    ? [...res.destinations, { ...currentScope, isCurrent: true }]
+    : res.destinations;
+
   const allScopeMap = {};
   for (const s of data.scopes) allScopeMap[s.id] = s;
-  for (const s of res.destinations) allScopeMap[s.id] = s;
+  for (const s of allScopes) allScopeMap[s.id] = s;
 
   function getDepth(scope) {
     let depth = 0, cur = scope;
@@ -595,9 +601,16 @@ async function openBulkMoveModal(items) {
     return depth;
   }
 
+  // Sort then build tree order
+  allScopes.sort((a, b) => {
+    const da = getDepth(a), db = getDepth(b);
+    if (da !== db) return da - db;
+    return a.name.localeCompare(b.name);
+  });
+
   const ordered = [];
   function addWithChildren(parentId) {
-    for (const s of res.destinations) {
+    for (const s of allScopes) {
       if ((s.parentId || null) === parentId) { ordered.push(s); addWithChildren(s.id); }
     }
   }
@@ -607,9 +620,11 @@ async function openBulkMoveModal(items) {
     const depth = getDepth(scope);
     const indentPx = depth > 0 ? ` style="padding-left:${depth * 28}px"` : "";
     const icon = scope.id === "global" ? "🌐" : (SCOPE_ICONS[scope.type] || "📂");
-    return `<div class="dest" data-scope-id="${esc(scope.id)}"${indentPx}>
+    const curClass = scope.isCurrent ? " cur" : "";
+    const curLabel = scope.isCurrent ? ' <span style="font-size:0.6rem;color:var(--text-faint);margin-left:4px;">(current)</span>' : "";
+    return `<div class="dest${curClass}" data-scope-id="${esc(scope.id)}"${indentPx}>
       <span class="di">${icon}</span>
-      <span class="dn">${esc(scope.name)}</span>
+      <span class="dn">${esc(scope.name)}${curLabel}</span>
       <span class="dp">${esc(scope.tag)}</span>
     </div>`;
   }).join("");
