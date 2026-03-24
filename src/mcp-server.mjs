@@ -14,7 +14,7 @@ import { moveItem, deleteItem, getValidDestinations } from './mover.mjs';
 
 const server = new McpServer({
   name: 'claude-code-organizer',
-  version: '0.3.6',
+  version: '0.4.0',
 });
 
 // Cache scan data so move/delete can look up items
@@ -54,7 +54,7 @@ server.tool(
   'move_item',
   'Move a Claude Code configuration item (memory, skill, MCP server) from one scope to another. Run scan_inventory first to see available items and scope IDs.',
   {
-    category: z.enum(['memory', 'skill', 'mcp']).describe('Category of item to move'),
+    category: z.enum(['memory', 'skill', 'mcp', 'plan', 'session']).describe('Category of item to move'),
     name: z.string().describe('Name of the item (as shown in scan_inventory results)'),
     fromScopeId: z.string().describe('Source scope ID (e.g. "global" or the encoded project directory name)'),
     toScopeId: z.string().describe('Destination scope ID'),
@@ -82,7 +82,7 @@ server.tool(
   'delete_item',
   'Delete a Claude Code configuration item (memory, skill, MCP server entry). Run scan_inventory first to see available items and scope IDs.',
   {
-    category: z.enum(['memory', 'skill', 'mcp']).describe('Category of item to delete'),
+    category: z.enum(['memory', 'skill', 'mcp', 'plan', 'session']).describe('Category of item to delete'),
     name: z.string().describe('Name of the item (as shown in scan_inventory results)'),
     scopeId: z.string().describe('Scope ID where the item lives'),
   },
@@ -109,7 +109,7 @@ server.tool(
   'list_destinations',
   'List valid destination scopes for a specific item. Shows where this item can be moved to.',
   {
-    category: z.enum(['memory', 'skill', 'mcp']).describe('Category of item'),
+    category: z.enum(['memory', 'skill', 'mcp', 'plan', 'session']).describe('Category of item'),
     name: z.string().describe('Name of the item'),
     scopeId: z.string().describe('Current scope ID of the item'),
   },

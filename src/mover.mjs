@@ -10,10 +10,27 @@
  * Pure data module. No HTTP, no UI.
  */
 
-import { rename, mkdir, readFile, writeFile, rm, unlink } from "node:fs/promises";
+import { rename, mkdir, readFile, writeFile, rm, unlink, cp } from "node:fs/promises";
 import { join, dirname, basename } from "node:path";
 import { homedir } from "node:os";
 import { existsSync } from "node:fs";
+
+/**
+ * Move a file or directory, falling back to copy+delete on EXDEV (cross-device).
+ */
+async function safeRename(src, dest, isDir = false) {
+  try {
+    await rename(src, dest);
+  } catch (err) {
+    if (err.code === "EXDEV") {
+      // Cross-device: copy then delete
+      await cp(src, dest, { recursive: isDir });
+      await rm(src, { recursive: isDir, force: true });
+    } else {
+      throw err;
+    }
+  }
+}
 
 const HOME = homedir();
 const CLAUDE_DIR = join(HOME, ".claude");
@@ -78,7 +95,7 @@ async function moveMemory(item, toScopeId) {
   }
 
   await mkdir(toDir, { recursive: true });
-  await rename(item.path, toPath);
+  await safeRename(item.path, toPath);
 
   return {
     ok: true,
@@ -103,7 +120,7 @@ async function moveSkill(item, toScopeId, scopes) {
   }
 
   await mkdir(toSkillsRoot, { recursive: true });
-  await rename(item.path, toPath);
+  await safeRename(item.path, toPath, true);
 
   return {
     ok: true,
@@ -124,7 +141,7 @@ async function movePlan(item, toScopeId) {
   }
 
   await mkdir(toDir, { recursive: true });
-  await rename(item.path, toPath);
+  await safeRename(item.path, toPath);
 
   return {
     ok: true,

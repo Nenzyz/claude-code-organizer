@@ -6,9 +6,28 @@
 
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
-import { join, extname } from "node:path";
+import { join, extname, resolve } from "node:path";
+import { homedir } from "node:os";
 import { scan } from "./scanner.mjs";
 import { moveItem, deleteItem, getValidDestinations } from "./mover.mjs";
+
+// ── Path safety ──────────────────────────────────────────────────────
+
+const HOME = homedir();
+const CLAUDE_DIR = join(HOME, ".claude");
+
+/**
+ * Validate that a file path is within allowed directories.
+ * Prevents path traversal attacks (e.g. ../../etc/passwd).
+ */
+function isPathAllowed(filePath) {
+  const resolved = resolve(filePath);
+  // Allow paths under ~/.claude/ or under any discovered project repoDir
+  if (resolved.startsWith(CLAUDE_DIR + "/") || resolved === CLAUDE_DIR) return true;
+  // Allow paths under HOME (covers repo dirs with .mcp.json, CLAUDE.md etc)
+  if (resolved.startsWith(HOME + "/")) return true;
+  return false;
+}
 
 const UI_DIR = join(import.meta.dirname, "ui");
 
@@ -37,7 +56,11 @@ function json(res, data, status = 200) {
 async function readBody(req) {
   let body = "";
   for await (const chunk of req) body += chunk;
-  return JSON.parse(body);
+  try {
+    return JSON.parse(body);
+  } catch {
+    throw new Error("Invalid JSON body");
+  }
 }
 
 async function serveFile(res, filePath) {
@@ -132,8 +155,8 @@ async function handleRequest(req, res) {
   // POST /api/restore — restore a deleted file (for undo)
   if (path === "/api/restore" && req.method === "POST") {
     const { filePath, content, isDir } = await readBody(req);
-    if (!filePath || !filePath.startsWith("/")) {
-      return json(res, { ok: false, error: "Invalid path" }, 400);
+    if (!filePath || !filePath.startsWith("/") || !isPathAllowed(filePath)) {
+      return json(res, { ok: false, error: "Invalid or disallowed path" }, 400);
     }
     try {
       const { mkdir, writeFile: wf } = await import("node:fs/promises");
@@ -157,8 +180,8 @@ async function handleRequest(req, res) {
   // POST /api/restore-mcp — restore a deleted MCP server entry
   if (path === "/api/restore-mcp" && req.method === "POST") {
     const { name, config, mcpJsonPath } = await readBody(req);
-    if (!name || !config || !mcpJsonPath) {
-      return json(res, { ok: false, error: "Missing name, config, or mcpJsonPath" }, 400);
+    if (!name || !config || !mcpJsonPath || !isPathAllowed(mcpJsonPath)) {
+      return json(res, { ok: false, error: "Missing name, config, or mcpJsonPath, or disallowed path" }, 400);
     }
     try {
       let content = { mcpServers: {} };
@@ -181,8 +204,8 @@ async function handleRequest(req, res) {
   // GET /api/file-content?path=... — read file content for detail panel
   if (path === "/api/file-content" && req.method === "GET") {
     const filePath = url.searchParams.get("path");
-    if (!filePath || !filePath.startsWith("/")) {
-      return json(res, { ok: false, error: "Invalid path" }, 400);
+    if (!filePath || !filePath.startsWith("/") || !isPathAllowed(filePath)) {
+      return json(res, { ok: false, error: "Invalid or disallowed path" }, 400);
     }
     try {
       const content = await readFile(filePath, "utf-8");
@@ -195,8 +218,8 @@ async function handleRequest(req, res) {
   // GET /api/session-preview?path=... — parse JSONL session into readable conversation
   if (path === "/api/session-preview" && req.method === "GET") {
     const filePath = url.searchParams.get("path");
-    if (!filePath || !filePath.endsWith(".jsonl")) {
-      return json(res, { ok: false, error: "Invalid session path" }, 400);
+    if (!filePath || !filePath.endsWith(".jsonl") || !isPathAllowed(filePath)) {
+      return json(res, { ok: false, error: "Invalid or disallowed session path" }, 400);
     }
     try {
       const raw = await readFile(filePath, "utf-8");
