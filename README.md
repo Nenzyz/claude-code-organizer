@@ -53,8 +53,9 @@ Claude auto-creates memories from things you said casually, or things it *though
 - **Same-type safety** — Memories can only move to memory folders, skills to skill folders, MCP to MCP configs
 - **Search & filter** — Instantly search across all items, filter by category (Memory, Skills, MCP, Config, Hooks, Plugins, Plans)
 - **Detail panel** — Click any item to see full metadata, description, file path, and open in VS Code
-- **Zero dependencies** — Pure Node.js built-in modules, SortableJS via CDN
+- **Full per-project scanning** — Every scope shows all item types: memories, skills, MCP servers, configs, hooks, and plans
 - **Real file moves** — Actually moves files in `~/.claude/`, not just a viewer
+- **45 E2E tests** — Playwright test suite with real filesystem verification after every operation
 
 ## Why a Visual Dashboard?
 
@@ -94,15 +95,15 @@ Opens a dashboard at `http://localhost:3847`. Works with your real `~/.claude/` 
 
 ## What It Manages
 
-| Type | View | Move Between Scopes |
-|------|:----:|:-------------------:|
-| Memories (feedback, user, project, reference) | Yes | Yes |
-| Skills | Yes | Yes |
-| MCP Servers | Yes | Yes |
-| Config (CLAUDE.md, settings.json) | Yes | Locked |
-| Hooks | Yes | Locked |
-| Plugins | Yes | Locked |
-| Plans | Yes | Locked |
+| Type | View | Move | Per-Project | Why locked? |
+|------|:----:|:----:|:-----------:|-------------|
+| Memories (feedback, user, project, reference) | Yes | Yes | Yes | — |
+| Skills | Yes | Yes | Yes | — |
+| MCP Servers | Yes | Yes | Yes | — |
+| Config (CLAUDE.md, settings.json) | Yes | Locked | Yes | System settings — move could break config |
+| Hooks | Yes | Locked | Yes | Depends on settings context — silent failures |
+| Plans | Yes | Locked | Yes | — |
+| Plugins | Yes | Locked | Global only | Claude Code managed cache |
 
 ## Scope Hierarchy
 
@@ -171,7 +172,10 @@ The dashboard is backed by a REST API:
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/api/scan` | GET | Scan all customizations, returns scopes + items + counts |
-| `/api/move` | POST | Move an item to a different scope |
+| `/api/move` | POST | Move an item to a different scope (supports category/name disambiguation) |
+| `/api/delete` | POST | Delete an item permanently |
+| `/api/restore` | POST | Restore a deleted file (for undo) |
+| `/api/restore-mcp` | POST | Restore a deleted MCP server entry |
 | `/api/destinations` | GET | Get valid move destinations for an item |
 | `/api/file-content` | GET | Read file content for detail panel |
 
