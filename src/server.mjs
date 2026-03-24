@@ -68,12 +68,18 @@ async function handleRequest(req, res) {
 
   // POST /api/move — move an item to a different scope
   if (path === "/api/move" && req.method === "POST") {
-    const { itemPath, toScopeId } = await readBody(req);
+    const { itemPath, toScopeId, category, name } = await readBody(req);
 
     if (!cachedData) await freshScan();
 
-    // Find the item by path
-    const item = cachedData.items.find(i => i.path === itemPath && !i.locked);
+    // Find the item by path + optional category/name (needed to disambiguate
+    // items sharing the same file, e.g. multiple MCP servers in one .mcp.json)
+    const item = cachedData.items.find(i =>
+      i.path === itemPath &&
+      !i.locked &&
+      (!category || i.category === category) &&
+      (!name || i.name === name)
+    );
     if (!item) return json(res, { ok: false, error: "Item not found or locked" }, 400);
 
     const result = await moveItem(item, toScopeId, cachedData.scopes);
@@ -86,11 +92,16 @@ async function handleRequest(req, res) {
 
   // POST /api/delete — delete an item
   if (path === "/api/delete" && req.method === "POST") {
-    const { itemPath } = await readBody(req);
+    const { itemPath, category, name } = await readBody(req);
 
     if (!cachedData) await freshScan();
 
-    const item = cachedData.items.find(i => i.path === itemPath && !i.locked);
+    const item = cachedData.items.find(i =>
+      i.path === itemPath &&
+      !i.locked &&
+      (!category || i.category === category) &&
+      (!name || i.name === name)
+    );
     if (!item) return json(res, { ok: false, error: "Item not found or locked" }, 400);
 
     const result = await deleteItem(item, cachedData.scopes);

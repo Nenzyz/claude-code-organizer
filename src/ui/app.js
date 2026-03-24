@@ -1154,7 +1154,7 @@ async function doMove(itemPath, toScopeId, skipRefresh = false) {
   const response = await fetch("/api/move", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ itemPath, toScopeId }),
+    body: JSON.stringify({ itemPath, toScopeId, category: item?.category, name: item?.name }),
   });
   const result = await response.json();
 

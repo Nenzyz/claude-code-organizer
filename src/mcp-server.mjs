@@ -14,7 +14,7 @@ import { moveItem, deleteItem, getValidDestinations } from './mover.mjs';
 
 const server = new McpServer({
   name: 'claude-code-organizer',
-  version: '0.3.4',
+  version: '0.3.5',
 });
 
 // Cache scan data so move/delete can look up items

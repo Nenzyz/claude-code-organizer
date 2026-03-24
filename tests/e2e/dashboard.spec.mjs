@@ -428,38 +428,77 @@ test.describe('Mutations — MCP', () => {
   test.beforeEach(async () => { env = await createTestEnv(); });
   test.afterEach(async () => { await env.cleanup(); });
 
-  test('MCP server move manipulates JSON correctly', async () => {
-    // Create a fixture with just ONE MCP server to avoid the path-only lookup bug
-    // (server.mjs /api/move finds items by path only — when two MCP servers share
-    // the same .mcp.json file, it picks the first one. This is a known limitation.)
-    const mcpJson = join(env.claudeDir, '.mcp.json');
-    await writeFile(mcpJson, JSON.stringify({
-      mcpServers: {
-        'solo-server': { command: 'npx', args: ['-y', 'solo-mcp'] },
-      }
-    }, null, 2));
-
+  test('MCP move targets correct server when multiple share same file', async () => {
+    // This tests the fix for the path-only lookup bug.
+    // Two MCP servers in one .mcp.json — move should target the specified one.
+    const srcJson = join(env.claudeDir, '.mcp.json');
     const dstJson = join(env.projectDir, '.mcp.json');
 
-    // Fresh scan to pick up the new MCP config
     const scanRes = await (await fetch(`${env.baseURL}/api/scan`)).json();
-    const mcp = scanRes.items.find(i => i.name === 'solo-server' && i.category === 'mcp');
+    const mcp = scanRes.items.find(i => i.name === 'dev-tools' && i.category === 'mcp');
     expect(mcp).toBeTruthy();
 
+    // Pass category + name to disambiguate
     const res = await fetch(`${env.baseURL}/api/move`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ itemPath: mcp.path, toScopeId: env.encodedProject }),
+      body: JSON.stringify({
+        itemPath: mcp.path,
+        toScopeId: env.encodedProject,
+        category: 'mcp',
+        name: 'dev-tools',
+      }),
     });
     const data = await res.json();
     expect(data.ok).toBe(true);
 
-    const afterSrc = JSON.parse(await readFile(mcpJson, 'utf-8'));
+    const afterSrc = JSON.parse(await readFile(srcJson, 'utf-8'));
     const afterDst = JSON.parse(await readFile(dstJson, 'utf-8'));
 
-    expect(afterSrc.mcpServers['solo-server']).toBeUndefined();
-    expect(afterDst.mcpServers['solo-server']).toBeTruthy();
-    expect(afterDst.mcpServers['solo-server'].command).toBe('npx');
+    // dev-tools moved, test-server stays
+    expect(afterSrc.mcpServers['dev-tools']).toBeUndefined();
+    expect(afterSrc.mcpServers['test-server']).toBeTruthy();
+    expect(afterDst.mcpServers['dev-tools']).toBeTruthy();
+    expect(afterDst.mcpServers['dev-tools'].command).toBe('npx');
+  });
+
+  test('skill move relocates entire directory + verify on disk', async () => {
+    const srcDir = join(env.dirs.globalSkills, 'deploy');
+    const dstDir = join(env.dirs.projectSkills, 'deploy');
+
+    expect(await dirExists(srcDir)).toBe(true);
+    expect(await fileExists(join(srcDir, 'SKILL.md'))).toBe(true);
+    expect(await dirExists(dstDir)).toBe(false);
+
+    const scanRes = await (await fetch(`${env.baseURL}/api/scan`)).json();
+    const skill = scanRes.items.find(i => i.name === 'deploy' && i.category === 'skill');
+    expect(skill).toBeTruthy();
+
+    const res = await fetch(`${env.baseURL}/api/move`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        itemPath: skill.path,
+        toScopeId: env.encodedProject,
+        category: 'skill',
+        name: 'deploy',
+      }),
+    });
+    const data = await res.json();
+    expect(data.ok).toBe(true);
+
+    // Source directory gone, destination has it
+    expect(await dirExists(srcDir)).toBe(false);
+    expect(await dirExists(dstDir)).toBe(true);
+    expect(await fileExists(join(dstDir, 'SKILL.md'))).toBe(true);
+    const content = await readFile(join(dstDir, 'SKILL.md'), 'utf-8');
+    expect(content).toContain('Deploy the application');
+
+    // Rescan confirms scanner finds it in new scope
+    const after = await (await fetch(`${env.baseURL}/api/scan`)).json();
+    const moved = after.items.find(i => i.name === 'deploy' && i.category === 'skill');
+    expect(moved).toBeTruthy();
+    expect(moved.scopeId).toBe(env.encodedProject);
   });
 });
 
