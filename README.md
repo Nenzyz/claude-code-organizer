@@ -202,6 +202,19 @@ The dashboard is backed by a REST API:
 | `/api/file-content` | GET | Read file content for detail panel preview |
 | `/api/session-preview` | GET | Parse JSONL session into readable conversation with speaker labels |
 
+## Roadmap
+
+| Feature | Status | Description |
+|---------|:------:|-------------|
+| **Config Export/Backup** | 🔜 Next | One-click export all scanned files to a backup folder — your own snapshot |
+| **Skill Quality Scoring** | 📋 Planned | Rate and surface the best skills from 5,000+ in the ecosystem — no more guessing |
+| **Security Audit** | 📋 Planned | Scan your `.claude/` for risky permissions, leaked secrets, or suspicious hooks |
+| **Cross-Harness Portability** | 📋 Planned | Convert skills/configs between Claude Code ↔ Cursor ↔ Codex ↔ Gemini CLI |
+| **Cost Tracker** | 💡 Exploring | Track token usage and cost per session, per project |
+| **Diff View** | 💡 Exploring | Compare configs between scopes or between snapshots |
+
+Have a feature idea? [Open an issue](https://github.com/mcpware/claude-code-organizer/issues).
+
 ## License
 
 MIT
