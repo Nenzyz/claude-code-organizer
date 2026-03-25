@@ -34,6 +34,8 @@ npx @mcpware/claude-code-organizer
 
 One command. See everything Claude has stored — organized by scope hierarchy. **Drag items between scopes.** Delete stale memories. Find duplicates. Take control of what actually influences Claude's behavior.
 
+> **First run auto-installs a `/cco` skill** — after that, just type `/cco` in any Claude Code session to open the dashboard. No need to remember the npx command.
+
 ### Example: Project → Global
 
 You told Claude "I prefer TypeScript + ESM" while inside a project, but that preference applies everywhere. Open the dashboard, drag that memory from Project to Global. **Done. One drag.**

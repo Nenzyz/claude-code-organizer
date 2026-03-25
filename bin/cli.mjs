@@ -8,7 +8,7 @@
  *   node bin/cli.mjs --port 3847  → Start web dashboard on custom port
  */
 
-import { access, constants } from 'node:fs/promises';
+import { access, constants, mkdir, writeFile, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 
@@ -30,6 +30,33 @@ if (!isMcpMode) {
     console.error(`    2. Check permissions: ls -la ~/.claude/`);
     console.error(`    3. If needed:  chmod u+r ~/.claude\n`);
     process.exit(1);
+  }
+}
+
+// ── Auto-install /cco skill if not present ──
+if (!isMcpMode) {
+  const skillDir = join(homedir(), '.claude', 'skills', 'cco');
+  const skillFile = join(skillDir, 'SKILL.md');
+  try {
+    await access(skillFile, constants.R_OK);
+  } catch {
+    // Skill doesn't exist yet — install it
+    try {
+      await mkdir(skillDir, { recursive: true });
+      await writeFile(skillFile, [
+        '---',
+        'name: cco',
+        'description: Open Claude Code Organizer dashboard to manage memories, skills, MCP servers across scopes',
+        '---',
+        '',
+        'Run `npx @mcpware/claude-code-organizer` to open the config management dashboard at localhost:3847.',
+        'The dashboard shows your full scope hierarchy (Global > Workspace > Project) with drag-and-drop between scopes.',
+        ''
+      ].join('\n'));
+      console.log('  ✓ Installed /cco skill globally — next time just type /cco in Claude Code!\n');
+    } catch {
+      // Non-critical — skip silently if we can't write
+    }
   }
 }
 
