@@ -38,7 +38,7 @@ Claude Code โหลด config ทั้งหมดอัตโนมัติ
 - **System reminders** — คำเตือน malware, token reminders และ injections ซ่อนอื่น ๆ
 - **Conversation history** — ข้อความ, คำตอบของ Claude และ tool results ทั้งหมดถูกส่งซ้ำทุก API call
 
-การใช้จริงระหว่าง session สูงกว่า 69.2K มาก แค่มองไม่เห็น
+ดังนั้นก่อนที่คุณจะเริ่มพิมพ์ การใช้จริงก็เกิน 69.2K ไปมากแล้ว แค่มองไม่เห็น
 
 ### Config อยู่ผิด scope
 
@@ -115,9 +115,9 @@ claude-code-organizer
 
 วางข้อความนี้ใน Claude Code:
 
-> Run `npx @mcpware/claude-code-organizer` — it's a dashboard for managing Claude Code settings. Tell me the URL when it's ready.
+> Run `npx @mcpware/claude-code-organizer` — it's a dashboard for managing all Claude Code resources. Tell me the URL when it's ready.
 
-เมื่อรันแล้ว dashboard จะเปิดที่ `http://localhost:3847` และทำงานกับ `~/.claude/` จริงของคุณ
+เมื่อรันแล้ว dashboard จะเปิดที่ `http://localhost:3847` และทำงานกับ `~/.claude/` จริงของคุณ ครั้งหน้าแค่พิมพ์ `/cco` ใน Claude Code ก็เปิดใหม่ได้เลย
 
 ## สิ่งที่จัดการได้
 

@@ -41,7 +41,7 @@ Claude Code 啟動時會自動預載所有設定檔 — CLAUDE.md、記憶、ski
 - **System reminders** — malware 警告、token 提醒等隱藏 injections
 - **Conversation history** — 你的訊息、Claude 的回覆和所有 tool results 每次 API call 都會重新發送
 
-所以 session 進行到一半時，實際用量遠超 69.2K。你只是看不到。
+所以你還沒開始輸入，實際用量就已經遠超 69.2K。你只是看不到。
 
 ### Config 散落在錯誤的 scope
 
@@ -146,9 +146,9 @@ claude-code-organizer
 
 把這段貼進 Claude Code:
 
-> 執行 `npx @mcpware/claude-code-organizer`，這是一個用來管理 Claude Code 設定的 dashboard。準備好之後把 URL 告訴我。
+> 執行 `npx @mcpware/claude-code-organizer` — 這是一個用來管理所有 Claude Code 資源的 dashboard。準備好之後把 URL 告訴我。
 
-會在 `http://localhost:3847` 打開 dashboard，直接操作你實際的 `~/.claude/` 目錄。
+會在 `http://localhost:3847` 打開 dashboard，直接操作你實際的 `~/.claude/` 目錄。下次想再開，在 Claude Code 裡輸入 `/cco` 就好。
 
 ## 它能管理什麼
 

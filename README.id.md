@@ -38,7 +38,7 @@ Tapi itu baru bagian **statis**-nya. **Runtime injections** berikut ini belum te
 - **System reminders** — peringatan malware, pengingat token, dan injeksi tersembunyi lainnya
 - **Conversation history** — pesan kamu, jawaban Claude, dan semua tool results dikirim ulang di setiap API call
 
-Jadi pemakaian sebenarnya di tengah session jauh lebih tinggi dari 69.2K. Kamu cuma nggak bisa lihat.
+Jadi sebelum kamu mulai mengetik, pemakaian sebenarnya sudah jauh di atas 69.2K. Kamu cuma nggak bisa lihat.
 
 ### Konfigurasi nyasar di scope yang salah
 
@@ -115,9 +115,9 @@ claude-code-organizer
 
 Tempelkan ini ke Claude Code:
 
-> Jalankan `npx @mcpware/claude-code-organizer` — ini dashboard untuk mengelola pengaturan Claude Code. Beri tahu saya URL-nya saat sudah siap.
+> Jalankan `npx @mcpware/claude-code-organizer` — ini dashboard untuk mengelola semua resource Claude Code. Beri tahu saya URL-nya saat sudah siap.
 
-Dashboard akan terbuka di `http://localhost:3847`. Aplikasi ini bekerja langsung dengan direktori `~/.claude/` Anda yang sebenarnya.
+Dashboard akan terbuka di `http://localhost:3847` dan bekerja langsung dengan direktori `~/.claude/` Anda yang sebenarnya. Lain kali, cukup ketik `/cco` di Claude Code untuk membukanya lagi.
 
 ## yang dikelola
 

@@ -38,7 +38,7 @@ Ma questa è solo la parte **statica**. Queste **runtime injections** non sono i
 - **System reminders** — avvisi malware, promemoria sui token e altre iniezioni nascoste
 - **Conversation history** — i tuoi messaggi, le risposte di Claude e tutti i tool results vengono rinviati a ogni API call
 
-L'utilizzo reale a metà sessione è molto superiore a 69.2K. Semplicemente non lo vedi.
+Quindi prima ancora di iniziare a digitare, l'utilizzo reale è già ben oltre i 69.2K. Semplicemente non lo vedi.
 
 ### Le configurazioni finiscono nello scope sbagliato
 
@@ -115,9 +115,9 @@ claude-code-organizer
 
 Incolla questo messaggio in Claude Code:
 
-> Esegui `npx @mcpware/claude-code-organizer` - è una dashboard per gestire le impostazioni di Claude Code. Dimmi l'URL quando è pronto.
+> Esegui `npx @mcpware/claude-code-organizer` — è una dashboard per gestire tutte le risorse di Claude Code. Dimmi l'URL quando è pronto.
 
-Si apre una dashboard su `http://localhost:3847`. Funziona con la tua directory `~/.claude/` reale.
+Si apre una dashboard su `http://localhost:3847` che lavora direttamente con la tua directory `~/.claude/` reale. La prossima volta, basta digitare `/cco` in Claude Code per riaprirla.
 
 ## Cosa gestisce
 

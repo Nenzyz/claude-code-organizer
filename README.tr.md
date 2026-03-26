@@ -38,7 +38,7 @@ Ama bu sadece **statik** kısım. Şu **runtime injections** dahil değil:
 - **System reminders** — malware uyarıları, token hatırlatmaları ve diğer gizli injection'lar
 - **Conversation history** — mesajların, Claude'un yanıtları ve tüm tool sonuçları her API call'da tekrar gönderiliyor
 
-Oturum ortasındaki gerçek kullanımın 69.2K'dan çok daha yüksek. Sadece göremiyorsun.
+Yani daha yazmaya başlamadan gerçek kullanım çoktan 69.2K'yı aşmış oluyor. Sadece göremiyorsun.
 
 ### Config'lerin yanlış scope'ta
 
@@ -115,9 +115,9 @@ claude-code-organizer
 
 Bunu Claude Code içine yapıştırın:
 
-> `npx @mcpware/claude-code-organizer` komutunu çalıştır; bu araç Claude Code ayarlarını yönetmek için bir dashboard açar. Hazır olunca URL'yi söyle.
+> `npx @mcpware/claude-code-organizer` komutunu çalıştır — bu araç tüm Claude Code kaynaklarını yönetmek için bir dashboard açar. Hazır olunca URL'yi söyle.
 
-`http://localhost:3847` adresinde bir dashboard açılır. Gerçek `~/.claude/` dizininizle çalışır.
+`http://localhost:3847` adresinde bir dashboard açılır ve gerçek `~/.claude/` dizininizle çalışır. Bir dahaki sefere Claude Code'da `/cco` yazmanız yeterli.
 
 ## Neleri yönetir
 

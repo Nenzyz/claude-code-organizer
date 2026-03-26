@@ -35,7 +35,7 @@ Claude Code 启动时会自动预加载一堆配置文件 — CLAUDE.md、记忆
 - **System reminders** — malware 警告、token 提示等隐藏 injections
 - **Conversation history** — 你的消息、Claude 的回复和所有 tool results 每次 API call 都重新发送
 
-所以 session 进行到一半的时候，实际用量远高于 69.2K。你只是看不到。
+所以你还没开始打字，实际用量就已经远超 69.2K。你只是看不到。
 
 ### 配置散落在错误的位置
 
@@ -112,9 +112,9 @@ claude-code-organizer
 
 直接把这段话丢给 Claude Code：
 
-> 帮我跑 `npx @mcpware/claude-code-organizer`，这是一个管理 Claude Code 设置的仪表盘。跑起来之后告诉我 URL。
+> 帮我跑 `npx @mcpware/claude-code-organizer` — 这是一个管理所有 Claude Code 资源的仪表盘。跑起来之后告诉我 URL。
 
-浏览器打开 `http://localhost:3847`，直接操作你本地的 `~/.claude/` 目录。
+浏览器打开 `http://localhost:3847`，直接操作你本地的 `~/.claude/` 目录。下次想再开，在 Claude Code 里输入 `/cco` 就行。
 
 ## 管理范围
 

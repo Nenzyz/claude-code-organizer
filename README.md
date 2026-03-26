@@ -39,7 +39,7 @@ And that's just what we can count. It does **not** include **runtime injections*
 - **System reminders** — malware warnings, token nudges, and other hidden injections appended to messages
 - **Conversation history** — your messages, Claude's responses, and all tool results are resent on every API call
 
-Your actual mid-session usage is significantly higher than 69.2K. You just can't see it.
+So before you even start typing, the real usage is already well above 69.2K. You just can't see it.
 
 ### Problem 2: Your context is contaminated
 

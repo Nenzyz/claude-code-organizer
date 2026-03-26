@@ -38,7 +38,7 @@ Nhưng đó chỉ là phần **tĩnh**. Những **runtime injections** sau đây
 - **System reminders** — cảnh báo malware, nhắc token và các injection ẩn khác
 - **Conversation history** — tin nhắn, phản hồi Claude và tất cả tool results gửi lại mỗi API call
 
-Mức sử dụng thực giữa session cao hơn 69.2K rất nhiều. Bạn chỉ không thấy.
+Vậy nên trước khi bạn bắt đầu gõ, mức sử dụng thực đã vượt xa 69.2K rồi. Bạn chỉ không thấy.
 
 ### Config nằm sai scope
 
@@ -115,9 +115,9 @@ claude-code-organizer
 
 Dán đoạn này vào Claude Code:
 
-> Chạy `npx @mcpware/claude-code-organizer` — đây là một dashboard để quản lý thiết lập của Claude Code. Khi sẵn sàng thì báo cho tôi URL.
+> Chạy `npx @mcpware/claude-code-organizer` — đây là một dashboard để quản lý tất cả tài nguyên của Claude Code. Khi sẵn sàng thì báo cho tôi URL.
 
-Dashboard sẽ mở tại `http://localhost:3847`. Dùng trực tiếp với thư mục `~/.claude/` thật của bạn.
+Dashboard sẽ mở tại `http://localhost:3847`, dùng trực tiếp với thư mục `~/.claude/` thật của bạn. Lần sau chỉ cần gõ `/cco` trong Claude Code là mở lại được.
 
 ## công cụ này quản lý gì
 
