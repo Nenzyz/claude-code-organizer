@@ -470,7 +470,7 @@ async function handleRequest(req, res) {
 
       for (const item of cachedData.items) {
         try {
-          const subDir = join(backupRoot, item.category, item.scopeId);
+          const subDir = join(backupRoot, item.scopeId, item.category);
           await mk(subDir, { recursive: true });
 
           if (item.category === "skill") {
