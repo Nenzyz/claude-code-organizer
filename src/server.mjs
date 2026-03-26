@@ -463,8 +463,7 @@ async function handleRequest(req, res) {
       const { mkdir: mk, copyFile: cpf, writeFile: wf, cp: cpDir } = await import("node:fs/promises");
       const { dirname, relative, basename } = await import("node:path");
 
-      const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-      const backupRoot = join(exportDir, `cco-backup-${ts}`);
+      const backupRoot = join(exportDir, "cco-backup");
       let copied = 0;
       const errors = [];
 
