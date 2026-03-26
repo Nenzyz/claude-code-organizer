@@ -40,7 +40,7 @@ The problem: **Claude doesn't care about scope when it creates things.** It dump
 
 Teams installed twice, Gmail three times, Playwright three times. You configured them in one scope, Claude reinstalled them in another. Each duplicate loads independently.
 
-**You can manage this with CLI commands** — `ls` one directory at a time, `cat` each file, `rm` what you don't need, manually `mv` to the right scope. But there's no single command that shows you the full picture: all items, all scopes, all inheritance, at once.
+**You can manage this with CLI commands or by asking Claude** — `ls` one directory, `cat` each file, ask Claude to move this here, delete that, show me what's in this scope. But you're spending turns and tokens just to understand the layout, one item at a time, before you can even decide what to do with it. There's no single view that shows you the full picture: all items, all scopes, all inheritance, at once.
 
 ### The fix: a visual config manager
 
