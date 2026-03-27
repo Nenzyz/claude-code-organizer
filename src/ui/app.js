@@ -109,6 +109,9 @@ async function init() {
     selectedScopeId = getInitialSelectedScopeId();
     initializeScopeState();
     setupUi();
+    // Load cached scan results + check for new servers BEFORE first render
+    await loadCachedSecurityResults();
+    await checkForNewMcpServers();
     renderAll();
     checkForUpdate();
   } catch (error) {
@@ -261,6 +264,29 @@ function setupItemList() {
 
     if (event.target.closest(".item-chk")) return;
 
+    // Click on security flag → open security panel and expand that server
+    const secFlag = event.target.closest(".item-sec-flag");
+    if (secFlag) {
+      const itemEl = secFlag.closest(".item");
+      const item = getItemByKey(itemEl?.dataset.itemKey);
+      if (!item || item.category !== "mcp") return;
+      // UNREACHABLE → open detail panel + highlight Fix Server button
+      if (getSecuritySeverity(item.name) === "unreachable") {
+        showDetail(item);
+        requestAnimationFrame(() => {
+          const fixBtn = document.querySelector('.cc-btn[data-prompt*="unreachable"], .cc-btn[data-prompt*="Fix Server"], .cc-btn[data-prompt*="diagnose and fix"]');
+          if (fixBtn) {
+            fixBtn.classList.add("sec-flash");
+            fixBtn.scrollIntoView({ behavior: "smooth", block: "center" });
+            setTimeout(() => fixBtn.classList.remove("sec-flash"), 2000);
+          }
+        });
+      } else {
+        openSecurityForServer(item.name);
+      }
+      return;
+    }
+
     const sortBtn = event.target.closest(".sort-btn");
     if (sortBtn) {
       const cat = sortBtn.dataset.cat;
@@ -411,6 +437,7 @@ function updateThemeButton() {
 function setupResizers() {
   setupResizer("resizerLeft", "sidebar", "left");
   setupResizer("resizerRight", "detailPanel", "right");
+  setupResizer("resizerSecurity", "securityPanel", "right");
 }
 
 function setupResizer(resizerId, panelId, direction) {
@@ -426,8 +453,13 @@ function setupResizer(resizerId, panelId, direction) {
     let panel = defaultPanel;
     if (resizerId === "resizerRight") {
       const budgetPanel = document.getElementById("ctxBudgetPanel");
+      const securityPanel = document.getElementById("securityPanel");
       if (budgetPanel && !budgetPanel.classList.contains("hidden")) {
         panel = budgetPanel;
+      } else if (securityPanel && !securityPanel.classList.contains("hidden") &&
+                 defaultPanel.classList.contains("hidden")) {
+        // Only resize security via resizerRight when no detail/budget panel is open
+        panel = securityPanel;
       }
     }
 
@@ -755,10 +787,17 @@ function renderItem(item) {
 
   // Security badge for MCP items
   const secSev = item.category === "mcp" ? getSecuritySeverity(item.name) : null;
-  const secLabel = secSev === "critical" ? "CRITICAL" : secSev === "high" ? "HIGH" : secSev === "medium" ? "MED" : secSev === "low" ? "LOW" : "";
+  const secLabel = secSev === "critical" ? "CRITICAL" : secSev === "high" ? "HIGH" : secSev === "medium" ? "MED" : secSev === "low" ? "LOW" : secSev === "unreachable" ? "UNREACHABLE" : "";
   const secBadgeHtml = secSev
     ? `<span class="sec-badge sec-${secSev} item-sec-flag">${secLabel}</span>`
     : "";
+  // Baseline status flag (NEW / CHANGED) for MCP items
+  const blStatus = item.category === "mcp" ? (securityBaselineStatus[item.name] || null) : null;
+  const blFlagHtml = blStatus === "new"
+    ? `<span class="sec-badge sec-new item-sec-flag">NEW</span>`
+    : blStatus === "changed"
+      ? `<span class="sec-badge sec-changed item-sec-flag">CHANGED</span>`
+      : "";
 
   return `
     <div class="item${item.locked ? " locked" : ""}${isSelected ? " selected" : ""}" data-item-key="${esc(key)}" data-path="${esc(item.path)}" data-category="${esc(item.category)}">
@@ -766,7 +805,7 @@ function renderItem(item) {
       ${checkbox}
       <span class="item-ico">${icon}</span>
       <span class="item-name">${esc(item.name)}</span>
-      ${secBadgeHtml}
+      ${secBadgeHtml}${blFlagHtml}
       ${badgeHtml}
       <span class="item-desc">${item.category === "mcp" ? "" : esc(desc)}</span>
       ${item.category === "mcp" ? "" : `<div class="item-right">
@@ -870,6 +909,9 @@ function renderCcActions(item) {
     case "mcp":
       buttons.push({ ico: "📋", label: "Explain This", prompt: `I have a Claude Code MCP server called "${item.name}" at:\n${item.path}\n\nPlease explain:\n1. What does this MCP server do?\n2. What tools does it provide?\n3. How is it configured (command, args, env)?\n4. Is it currently working? Check if the command exists on this system.` });
       buttons.push({ ico: "🔧", label: "Edit Config", prompt: `I want to modify this MCP server configuration: "${item.name}"\nPath: ${item.path}\n\nBefore changing:\n1. Read the current MCP config\n2. Show me the current command, args, and env settings\n3. Ask me what I want to change\n4. Show the before vs after diff\n5. Warn if this could break any tools that depend on this MCP server\n6. Only save after I confirm` });
+      if (getSecuritySeverity(item.name) === "unreachable") {
+        buttons.push({ ico: "🩺", label: "Fix Server", prompt: `My MCP server "${item.name}" is unreachable — it failed to connect during a security scan.\nConfig path: ${item.path}\nConfig: ${JSON.stringify(item.mcpConfig, null, 2)}\n\nPlease diagnose and fix:\n1. Check if the command exists: which ${item.mcpConfig?.command || "unknown"}\n2. If it's an npx package, check if it's installed: npm ls -g ${(item.mcpConfig?.args || [])[1] || ""}\n3. Check if required env vars are set\n4. Try running the server manually to see the error\n5. Suggest a fix (install package, set env var, fix config)\n6. Only make changes after I confirm` });
+      }
       break;
     case "plan":
       buttons.push({ ico: "📋", label: "Explain This", prompt: explainPrompt });
@@ -2354,19 +2396,30 @@ let securityScanResults = null;
 
 /** Map of MCP server name → highest severity found. Used by renderItem() to show badges. */
 let securityBadges = {};
+/** Map of MCP server name → baseline status ("new" | "changed" | null). */
+let securityBaselineStatus = {};
 
 function setupSecurityScan() {
   const btn = document.getElementById("securityScanBtn");
   const panel = document.getElementById("securityPanel");
   const closeBtn = document.getElementById("securityClose");
   const startBtn = document.getElementById("securityStartBtn");
+  const rescanBtn = document.getElementById("securityRescanBtn");
 
   if (!btn) return;
 
-  btn.addEventListener("click", () => {
+  // Cached results + new server check loaded in init() before renderAll
+
+  btn.addEventListener("click", async () => {
     document.getElementById("ctxBudgetPanel")?.classList.add("hidden");
     panel.classList.remove("hidden");
-    if (securityScanResults) renderSecurityResults(securityScanResults);
+
+    // If shimmer alert is active → auto-scan immediately
+    if (btn.classList.contains("sec-btn-alert")) {
+      await runSecurityScan();
+    } else if (securityScanResults) {
+      renderSecurityResults(securityScanResults);
+    }
   });
 
   closeBtn?.addEventListener("click", () => {
@@ -2374,6 +2427,10 @@ function setupSecurityScan() {
   });
 
   startBtn?.addEventListener("click", async () => {
+    await runSecurityScan();
+  });
+
+  rescanBtn?.addEventListener("click", async () => {
     await runSecurityScan();
   });
 
@@ -2406,9 +2463,8 @@ function navigateToMcpServer(serverName, scopeId) {
   // Filter to MCP category
   activeFilters = new Set(["mcp"]);
 
-  // Select the item and open detail panel (alongside security panel)
+  // Highlight the item but don't open detail panel — let user click to inspect
   selectedItem = item;
-  document.getElementById("detailPanel").classList.remove("hidden");
   renderAll();
 
   // Scroll to the item
@@ -2420,6 +2476,37 @@ function navigateToMcpServer(serverName, scopeId) {
       setTimeout(() => row.classList.remove("sec-flash"), 1500);
     }
     loadPreview(item);
+  });
+}
+
+/** Open security panel and auto-expand findings for a specific server. */
+function openSecurityForServer(serverName) {
+  if (!securityScanResults) return;
+
+  // Show security panel
+  document.getElementById("ctxBudgetPanel")?.classList.add("hidden");
+  const panel = document.getElementById("securityPanel");
+  panel.classList.remove("hidden");
+  renderSecurityResults(securityScanResults);
+
+  // Find and expand the matching server row
+  requestAnimationFrame(() => {
+    const rows = panel.querySelectorAll(".sec-server-row");
+    for (const row of rows) {
+      if (row.dataset.secServer === serverName) {
+        // Expand its findings
+        const toggle = row.querySelector(".sec-collapse-btn");
+        const list = row.nextElementSibling;
+        if (list?.classList.contains("sec-findings-list") && list.classList.contains("hidden")) {
+          list.classList.remove("hidden");
+          if (toggle) toggle.textContent = "▾";
+        }
+        row.scrollIntoView({ behavior: "smooth", block: "center" });
+        row.classList.add("sec-flash");
+        setTimeout(() => row.classList.remove("sec-flash"), 1500);
+        break;
+      }
+    }
   });
 }
 
@@ -2464,8 +2551,9 @@ async function runSecurityScan() {
     progressBar.style.width = "100%";
     securityScanResults = scanData;
 
-    // Build badge map for item list
+    // Build badge + baseline status maps for item list
     securityBadges = {};
+    securityBaselineStatus = {};
     for (const server of (scanData.servers || [])) {
       if (server.findings?.length > 0) {
         const maxSev = server.findings.reduce((max, f) => {
@@ -2473,12 +2561,43 @@ async function runSecurityScan() {
           return (order[f.severity] || 0) > (order[max] || 0) ? f.severity : max;
         }, "info");
         securityBadges[server.serverName] = maxSev;
+      } else if (server.status === "error") {
+        securityBadges[server.serverName] = "unreachable";
       }
+    }
+    for (const b of (scanData.baselines || [])) {
+      if (b.isFirstScan) securityBaselineStatus[b.serverName] = "new";
+      else if (b.hasChanges) securityBaselineStatus[b.serverName] = "changed";
     }
 
     renderSecurityResults(scanData);
-    // Re-render main list to show security badges on MCP items
+    // Re-render main list — badges only on servers with findings, clean servers get cleared
     renderAll();
+    // Cache results for next session
+    saveSecurityResults(scanData);
+    // Clear NEW flags (baselines updated), but check for CHANGED servers
+    securityBaselineStatus = {};
+    const changedCount = (scanData.baselines || []).filter(b => b.hasChanges && !b.isFirstScan).length;
+    const scanBtn = document.getElementById("securityScanBtn");
+
+    if (changedCount > 0 && scanBtn) {
+      // Servers changed since last scan — re-shimmer + CHANGED badges
+      for (const b of (scanData.baselines || [])) {
+        if (b.hasChanges && !b.isFirstScan) securityBaselineStatus[b.serverName] = "changed";
+      }
+      scanBtn.classList.add("sec-btn-alert");
+      scanBtn.querySelector(".sec-btn-tooltip")?.remove();
+      const tip = document.createElement("span");
+      tip.className = "sec-btn-tooltip";
+      tip.textContent = `${changedCount} MCP server${changedCount > 1 ? "s" : ""} changed — click to rescan`;
+      scanBtn.appendChild(tip);
+      renderAll(); // re-render to show CHANGED badges
+    } else if (scanBtn) {
+      // All clear — remove shimmer + tooltip + re-render to clear badges
+      scanBtn.classList.remove("sec-btn-alert");
+      scanBtn.querySelector(".sec-btn-tooltip")?.remove();
+      renderAll();
+    }
 
   } catch (err) {
     progressText.textContent = `Error: ${err.message}`;
@@ -2494,6 +2613,7 @@ function renderSecurityResults(scanData) {
 
   progress.classList.add("hidden");
   results.classList.remove("hidden");
+  document.getElementById("securityRescanBtn")?.classList.remove("hidden");
   footer.classList.remove("hidden");
 
   const { severityCounts, totalTools, totalServers, serversConnected, baselines, findings } = scanData;
@@ -2599,16 +2719,21 @@ function renderSecurityResults(scanData) {
   // ── Failed servers (collapsed) ──
   const failedServers = (scanData.servers || []).filter(s => s.status === "error");
   if (failedServers.length > 0) {
-    html += `<div class="ctx-section">`;
-    html += `<div class="ctx-section-hdr">`;
-    html += `<span class="ctx-collapse-btn sec-collapse-btn">▸</span>`;
-    html += `<span class="ctx-section-title">${failedServers.length} unreachable</span>`;
+    html += `<div class="sec-server-row sec-unreachable-toggle">`;
+    html += `<span class="sec-row-toggle sec-collapse-btn">▸</span>`;
+    html += `<span class="sec-row-icon">⚠️</span>`;
+    html += `<span class="sec-row-name">${failedServers.length} Unreachable</span>`;
     html += `</div>`;
-    html += `<div class="ctx-section-items hidden">`;
+    html += `<div class="sec-findings-list hidden">`;
     for (const s of failedServers) {
-      html += `<div class="ctx-item"><span class="ctx-item-icon">⚠️</span><span class="ctx-item-name">${esc(s.serverName)}</span></div>`;
+      const scopeId = s.scopeId || "global";
+      html += `<div class="sec-server-row" data-sec-server="${esc(s.serverName)}" data-sec-scope="${esc(scopeId)}" style="margin-left:12px">`;
+      html += `<span class="sec-row-icon">🔌</span>`;
+      html += `<span class="sec-row-name">${esc(s.serverName)}</span>`;
+      html += `<span class="sec-badge sec-unreachable">UNREACHABLE</span>`;
+      html += `</div>`;
     }
-    html += `</div></div>`;
+    html += `</div>`;
   }
 
   results.innerHTML = html;
@@ -2647,6 +2772,92 @@ function renderSecurityResults(scanData) {
 
   const scanTime = new Date(scanData.timestamp).toLocaleString();
   footerNote.textContent = `${scanTime}`;
+}
+
+/** Save security scan results to server for persistence across sessions. */
+function saveSecurityResults(scanData) {
+  fetch("/api/security-cache", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(scanData),
+  }).catch(() => {}); // Fire and forget
+}
+
+/** Load cached security scan results from server on startup. */
+async function loadCachedSecurityResults() {
+  try {
+    const resp = await fetch("/api/security-cache");
+    const cached = await resp.json();
+    if (!cached.ok || !cached.data) return;
+
+    securityScanResults = cached.data;
+
+    // Rebuild badge map (don't reset baselineStatus — checkForNewMcpServers may have set it)
+    securityBadges = {};
+    for (const server of (cached.data.servers || [])) {
+      if (server.findings?.length > 0) {
+        const maxSev = server.findings.reduce((max, f) => {
+          const order = { critical: 4, high: 3, medium: 2, low: 1, info: 0 };
+          return (order[f.severity] || 0) > (order[max] || 0) ? f.severity : max;
+        }, "info");
+        securityBadges[server.serverName] = maxSev;
+      } else if (server.status === "error") {
+        securityBadges[server.serverName] = "unreachable";
+      }
+    }
+    for (const b of (cached.data.baselines || [])) {
+      if (b.isFirstScan) securityBaselineStatus[b.serverName] = "new";
+      else if (b.hasChanges) securityBaselineStatus[b.serverName] = "changed";
+    }
+
+    // Hide intro (results will render when user opens security panel)
+    const intro = document.getElementById("securityIntro");
+    if (intro) intro.classList.add("hidden");
+
+    // Check baselines for changes → pulse the sidebar button
+    const hasChanges = (cached.data.baselines || []).some(b => b.hasChanges && !b.isFirstScan);
+    if (hasChanges) {
+      const btn = document.getElementById("securityScanBtn");
+      if (btn) {
+        btn.classList.add("sec-btn-alert");
+        if (!btn.querySelector(".sec-btn-tooltip")) {
+          const tip = document.createElement("span");
+          tip.className = "sec-btn-tooltip";
+          tip.textContent = "MCP servers changed since last scan — click to rescan";
+          btn.appendChild(tip);
+        }
+      }
+    }
+  } catch {}
+}
+
+/** Check for new MCP servers on startup (no scan needed, just compare names against baselines). */
+async function checkForNewMcpServers() {
+  try {
+    const resp = await fetch("/api/security-baseline-check");
+    const result = await resp.json();
+    if (!result.ok) return;
+
+    // Mark new servers in baseline status map
+    for (const name of (result.newServers || [])) {
+      securityBaselineStatus[name] = "new";
+    }
+
+    // If there are new servers, shimmer the sidebar button + add tooltip
+    if (result.newServers?.length > 0) {
+      const btn = document.getElementById("securityScanBtn");
+      if (btn) {
+        btn.classList.add("sec-btn-alert");
+        // Add tooltip if not already present
+        if (!btn.querySelector(".sec-btn-tooltip")) {
+          const tip = document.createElement("span");
+          tip.className = "sec-btn-tooltip";
+          tip.textContent = `${result.newServers.length} new MCP server${result.newServers.length > 1 ? "s" : ""} detected — click to scan`;
+          btn.appendChild(tip);
+        }
+      }
+    }
+  } catch {}
 }
 
 init();

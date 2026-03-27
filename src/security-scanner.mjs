@@ -495,7 +495,7 @@ function scanText(text, sourceType, sourceName) {
 /**
  * Scan tool parameter names for suspicious exfiltration channels.
  */
-function scanParamNames(inputSchema, toolName) {
+function scanParamNames(inputSchema, toolName, serverName) {
   if (!inputSchema?.properties) return [];
   const findings = [];
 
@@ -508,7 +508,7 @@ function scanParamNames(inputSchema, toolName) {
         name: "Suspicious parameter name",
         description: `Parameter "${paramName}" suggests hidden data channel`,
         sourceType: "tool_param",
-        sourceName: `${toolName}.${paramName}`,
+        sourceName: `${serverName}/${toolName}.${paramName}`,
         matchedText: paramName,
         context: `Tool "${toolName}" has parameter "${paramName}" (${inputSchema.properties[paramName]?.type || "unknown"})`,
       });
@@ -635,12 +635,21 @@ async function updateBaselines(currentServers) {
   const now = new Date().toISOString();
 
   for (const server of currentServers) {
-    if (!server.ok) continue;
-    baselines[server.serverName] = {
-      toolHashes: server.toolHashes,
-      lastScan: now,
-      toolCount: server.tools.length,
-    };
+    if (server.ok) {
+      baselines[server.serverName] = {
+        toolHashes: server.toolHashes,
+        lastScan: now,
+        toolCount: server.tools.length,
+      };
+    } else if (!baselines[server.serverName]) {
+      // Record failed servers too so they don't show as "new" forever
+      baselines[server.serverName] = {
+        toolHashes: {},
+        lastScan: now,
+        toolCount: 0,
+        unreachable: true,
+      };
+    }
   }
 
   await saveBaselines(baselines);
@@ -795,7 +804,7 @@ export async function runSecurityScan(introspectionResults, scanData) {
       serverFindings.push(...descFindings);
 
       // Scan parameter names
-      const paramFindings = scanParamNames(tool.inputSchema, tool.name);
+      const paramFindings = scanParamNames(tool.inputSchema, tool.name, server.serverName);
       serverFindings.push(...paramFindings);
 
       // Also scan stringified inputSchema for hidden patterns

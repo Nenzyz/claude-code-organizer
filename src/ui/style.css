@@ -116,8 +116,14 @@ body {
   flex-direction: column;
 }
 .detail.hidden { display: none; }
-/* Hide resizer only when BOTH detail panels are hidden */
-#resizerRight:has(+ #detailPanel.hidden + #ctxBudgetPanel.hidden) { display: none; }
+/* Hide resizer only when ALL right panels are hidden */
+#resizerRight:has(+ #detailPanel.hidden + #ctxBudgetPanel.hidden + #resizerSecurity + #securityPanel.hidden) { display: none; }
+/* Show security resizer only when security panel AND another right panel are both visible */
+#resizerSecurity { display: none; }
+.app:has(#securityPanel:not(.hidden)):has(#detailPanel:not(.hidden)) #resizerSecurity,
+.app:has(#securityPanel:not(.hidden)):has(#ctxBudgetPanel:not(.hidden)) #resizerSecurity {
+  display: block;
+}
 
 .resizer {
   width: 4px;
@@ -1133,6 +1139,74 @@ body {
 }
 .sidebar-security-btn:active { transform: scale(0.98); }
 
+/* Rescan button in security panel header — matches sidebar security btn style */
+.security-rescan-btn {
+  margin-left: auto;
+  padding: 5px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  border: 1px solid var(--accent) !important;
+  background: linear-gradient(135deg, oklch(0.28 0.06 175), oklch(0.22 0.04 185)) !important;
+  color: var(--sidebar-text-bright) !important;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+.security-rescan-btn:hover {
+  background: linear-gradient(135deg, var(--accent), oklch(0.28 0.06 175)) !important;
+  color: #fff !important;
+  box-shadow: 0 0 8px oklch(0.58 0.15 175 / 0.3);
+}
+
+/* Shimmer/shine effect when new or changed MCP servers detected */
+@keyframes sec-shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+.sec-btn-alert {
+  background: linear-gradient(
+    110deg,
+    oklch(0.28 0.06 175) 30%,
+    oklch(0.45 0.10 175) 50%,
+    oklch(0.28 0.06 175) 70%
+  ) !important;
+  background-size: 200% 100%;
+  animation: sec-shimmer 3s ease infinite;
+}
+.sec-btn-alert:hover { animation: none; }
+
+/* Tooltip for alert button — below the button, inside sidebar bounds */
+.sidebar-security-btn { position: relative; }
+.sec-btn-tooltip {
+  display: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 6px);
+  background: var(--fg);
+  color: var(--bg);
+  font-size: 10px;
+  font-weight: 500;
+  padding: 5px 8px;
+  border-radius: var(--radius);
+  z-index: 100;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  line-height: 1.4;
+  text-align: center;
+}
+.sec-btn-tooltip::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-bottom-color: var(--fg);
+}
+.sidebar-security-btn:hover .sec-btn-tooltip { display: block; }
+
 /* ── Security Scan: Panel body ── */
 .security-body { padding: 12px 14px; overflow-y: auto; flex: 1; }
 .security-intro p { margin: 0 0 10px; color: var(--fg2); font-size: 12px; line-height: 1.5; }
@@ -1176,6 +1250,9 @@ body {
 .sec-medium { background: #d69e2e; color: #000; }
 .sec-low { background: #3182ce; color: #fff; }
 .sec-safe { background: #38a169; color: #fff; }
+.sec-new { background: #805ad5; color: #fff; }
+.sec-changed { background: #d69e2e; color: #000; }
+.sec-unreachable { background: #718096; color: #fff; }
 
 .security-clean {
   padding: 14px 12px;
@@ -1199,14 +1276,18 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 8px;
+  padding: 6px 10px;
   border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg2);
   cursor: pointer;
-  transition: background 100ms;
+  transition: all 100ms;
   font-size: 12px;
+  margin-bottom: 4px;
 }
-.sec-server-row:hover { background: var(--bg2); }
-.sec-row-toggle { font-size: 10px; color: var(--fg3); width: 12px; text-align: center; flex-shrink: 0; cursor: pointer; }
+.sec-server-row:hover { border-color: var(--accent); background: var(--bg); }
+.sec-row-toggle { font-size: 12px; color: var(--fg3); width: 20px; height: 20px; text-align: center; line-height: 20px; flex-shrink: 0; cursor: pointer; border-radius: 4px; }
+.sec-row-toggle:hover { background: var(--border); color: var(--fg); }
 .sec-row-icon { font-size: 12px; flex-shrink: 0; }
 .sec-row-name { flex: 1; font-weight: 600; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -1238,6 +1319,13 @@ body {
   font-size: 9px;
   padding: 1px 5px;
   vertical-align: middle;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+.item-sec-flag:hover {
+  transform: scale(1.15);
+  filter: brightness(1.2);
+  box-shadow: 0 0 6px currentColor;
 }
 
 /* ── Flash animation when navigating to item from finding ── */

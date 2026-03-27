@@ -804,6 +804,48 @@ async function handleRequest(req, res) {
     }
   }
 
+  // GET /api/security-baseline-check — compare current MCP servers against saved baselines (no scan needed)
+  if (path === "/api/security-baseline-check" && req.method === "GET") {
+    try {
+      if (!cachedData) await freshScan();
+      const mcpNames = new Set(cachedData.items.filter(i => i.category === "mcp" && i.mcpConfig).map(i => i.name));
+      const { loadBaselines } = await import("./security-scanner.mjs");
+      const baselines = await loadBaselines();
+      const baselineNames = new Set(Object.keys(baselines));
+
+      const newServers = [...mcpNames].filter(n => !baselineNames.has(n));
+      // Changed detection requires introspection (can't do without scan), so only flag new
+      return json(res, { ok: true, newServers });
+    } catch (err) {
+      return json(res, { ok: false, error: err.message }, 500);
+    }
+  }
+
+  // GET /api/security-cache — load cached scan results
+  if (path === "/api/security-cache" && req.method === "GET") {
+    try {
+      const cachePath = join(CLAUDE_DIR, ".cco-security", "last-scan.json");
+      const content = await readFile(cachePath, "utf-8");
+      return json(res, { ok: true, data: JSON.parse(content) });
+    } catch {
+      return json(res, { ok: false });
+    }
+  }
+
+  // POST /api/security-cache — save scan results for persistence
+  if (path === "/api/security-cache" && req.method === "POST") {
+    try {
+      const body = await readBody(req);
+      const { mkdir: mk, writeFile: wf } = await import("node:fs/promises");
+      const cacheDir = join(CLAUDE_DIR, ".cco-security");
+      await mk(cacheDir, { recursive: true });
+      await wf(join(cacheDir, "last-scan.json"), JSON.stringify(body));
+      return json(res, { ok: true });
+    } catch (err) {
+      return json(res, { ok: false, error: err.message }, 500);
+    }
+  }
+
   // ── Static UI files ──
 
   if (path === "/" || path === "/index.html") {

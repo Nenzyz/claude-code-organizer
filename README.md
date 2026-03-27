@@ -54,6 +54,10 @@ Every MCP server exposes tool definitions — name, description, input schema. T
 
 You install MCP servers from npm, pip, or random GitHub repos. **You have no way to inspect what their tool descriptions actually say** — until now.
 
+![Security Scan Results](docs/securitypanel.png)
+
+<sub>Security scanner detected 75 findings across 8 malicious test servers — prompt injection, credential theft, persistence backdoors, and data exfiltration</sub>
+
 ### Problem 2: You have no idea how much context is already used
 
 All of this wrong-scope and duplicate config has a cost. This is a real project directory after two weeks of use:
@@ -64,11 +68,15 @@ All of this wrong-scope and duplicate config has a cost. This is a real project 
 
 And these numbers only cover what we can measure offline. During a session, Claude silently adds more: rule files re-injected after every tool call, file change diffs, and your full conversation history resent on every API call.
 
-### The fix: a visual config manager
+### The fix: a visual config manager with security scanning
 
 ```bash
 npx @mcpware/claude-code-organizer
 ```
+
+![Security Scan Button](docs/securitybutton.png)
+
+<sub>New MCP servers detected — shimmer effect on the Security Scan button with tooltip prompting a rescan</sub>
 
 Think of it like a file manager for `~/.claude/`. You can do everything in terminal too — but sometimes you need to see the whole tree to understand what's going on.
 
