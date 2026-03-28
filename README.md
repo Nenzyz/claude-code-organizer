@@ -35,6 +35,10 @@ Other tools solve these one at a time. **CCO solves them in one loop:**
 
 **Fix** → Drag to the right scope. Delete the duplicate. Click a security finding and land directly on the MCP server entry — delete it, move it, or inspect its config. Done.
 
+![Scan, Find, Fix — all in one dashboard](docs/3panel.png)
+
+<sub>Four panels working together: scope tree, MCP server list with security badges, detail inspector, and security scan findings — click any finding to navigate directly to the server</sub>
+
 ```bash
 npx @mcpware/claude-code-organizer
 ```
