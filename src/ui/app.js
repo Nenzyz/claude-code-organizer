@@ -947,9 +947,10 @@ function renderItem(item) {
       ${dragHandle}
       ${checkbox}
       <span class="item-ico">${icon}</span>
+      ${effectiveBadge}
       <span class="item-name">${esc(item.name)}</span>
       ${secBadgeHtml}${blFlagHtml}
-      ${effectiveBadge}${badgeHtml}
+      ${badgeHtml}
       <span class="item-desc">${item.category === "mcp" ? "" : esc(desc)}</span>
       ${item.category === "mcp" ? "" : `<div class="item-right">
         <span class="item-size">${esc(sizeLabel)}</span>
