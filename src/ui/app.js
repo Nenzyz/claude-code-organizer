@@ -447,11 +447,15 @@ function setupCollapseAll() {
   const button = document.getElementById("collapseAllBtn");
   button.addEventListener("click", () => {
     if (uiState._dragCollapsed) {
+      // Expand: open all scopes
       uiState._dragCollapsed = false;
-      button.title = "Collapse to tree";
+      (data?.scopes || []).forEach(s => uiState.expandedScopes.add(s.id));
+      button.title = "Collapse all";
       button.textContent = "▤";
     } else {
+      // Collapse: close all scopes
       uiState._dragCollapsed = true;
+      uiState.expandedScopes.clear();
       button.title = "Expand all";
       button.textContent = "▦";
     }
