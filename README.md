@@ -6,18 +6,18 @@
 [![GitHub forks](https://img.shields.io/github/forks/mcpware/claude-code-organizer)](https://github.com/mcpware/claude-code-organizer/network/members)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](https://nodejs.org)
-[![Tests](https://img.shields.io/badge/tests-141%20passing-brightgreen)](https://github.com/mcpware/claude-code-organizer)
+[![Tests](https://img.shields.io/badge/tests-225%20passing-brightgreen)](https://github.com/mcpware/claude-code-organizer)
 [![Zero Telemetry](https://img.shields.io/badge/telemetry-zero-blue)](https://github.com/mcpware/claude-code-organizer)
 [![MCP Security](https://img.shields.io/badge/MCP-Security%20Scanner-red)](https://github.com/mcpware/claude-code-organizer)
 English | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [廣東話](README.zh-HK.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Bahasa Indonesia](README.id.md) | [Italiano](README.it.md) | [Português](README.pt-BR.md) | [Türkçe](README.tr.md) | [Tiếng Việt](README.vi.md) | [ไทย](README.th.md)
 
-**One dashboard to see everything Claude Code loads into context — scan for poisoned MCP servers, reclaim wasted tokens, and fix wrong-scope configs. All without leaving the window.**
+**One dashboard to see everything Claude Code loads into context — scan for poisoned MCP servers, reclaim wasted tokens, and fix misplaced configs. All without leaving the window.**
 
 > **Privacy:** CCO reads Claude Code config files on your machine (global and project-level). Nothing is sent externally. Zero telemetry.
 
 ![Claude Code Organizer Demo](docs/demo.gif)
 
-<sub>141 E2E tests | Zero dependencies | Demo recorded by AI using [Pagecast](https://github.com/mcpware/pagecast)</sub>
+<sub>225 tests (84 unit + 141 E2E) | Zero dependencies | Demo recorded by AI using [Pagecast](https://github.com/mcpware/pagecast)</sub>
 
 **[Watch the walkthrough on YouTube](https://www.youtube.com/watch?v=UAQsHwNHfcw)** — community demo by AI Coding Daily. Thank you for covering CCO!
 
@@ -43,7 +43,7 @@ Other tools solve these one at a time. **CCO solves them in one loop:**
 
 ![Scan, Find, Fix — all in one dashboard](docs/3panel.png)
 
-<sub>Scope list, MCP servers with security badges, detail inspector, and security scan findings — click any finding to navigate directly to the server</sub>
+<sub>Project list, MCP servers with security badges, detail inspector, and security scan findings — click any finding to navigate directly to the server</sub>
 
 **The difference from standalone scanners:** When CCO finds something, you click the finding and land on the MCP server entry. Delete it, move it, or inspect its config — without switching tools.
 
@@ -94,13 +94,11 @@ Claude Code doesn't use one universal rule for everything. Each category has its
 - **Skills**: available from personal, project, and plugin sources
 - **Config / Settings**: resolved by precedence chain
 
-Click **✦ Show Effective** to see what actually applies in any project. Shadowed items, name conflicts, and ancestor-loaded configs are all surfaced with badges and explanations. Hover any category pill for its specific rule.
+Click **✦ Show Effective** to see what actually applies in any project. Shadowed items, name conflicts, and ancestor-loaded configs are all surfaced with badges and explanations. Hover any category pill for its specific rule. Items are tagged: `GLOBAL`, `ANCESTOR`, `SHADOWED`, `⚠ CONFLICT`.
 
 ![Duplicate MCP Servers](docs/reloaded%20mcp%20form%20diff%20scope.png)
 
 Teams installed twice, Gmail three times, Playwright three times. You configured them in one place, Claude reinstalled them in another. CCO shows you all of it — then you fix it:
-
-- **Show Effective** — See what Claude actually loads for each project. Each category resolves by its own official rule. Items are tagged: `GLOBAL`, `ANCESTOR`, `SHADOWED`, `⚠ CONFLICT`.
 - **Move items** — Move a memory, skill, or MCP server where it belongs. Warnings shown for precedence changes and name conflicts.
 - **Find duplicates** — All items grouped by category. Three copies of the same memory? Delete the extras.
 - **Undo everything** — Every move and delete has an undo button, including MCP JSON entries.
@@ -139,7 +137,7 @@ CCO connects to every MCP server, retrieves actual tool definitions, and runs th
 
 ## How It Works
 
-1. **Scans** `~/.claude/` — discovers all 11 categories across every scope
+1. **Scans** `~/.claude/` — discovers all 11 categories across all projects
 2. **Resolves project scopes** — scans projects from filesystem paths, maps them to Claude Code's Global/Project scope model
 3. **Renders a dashboard** — scope list, category items, detail panel with content preview
 
