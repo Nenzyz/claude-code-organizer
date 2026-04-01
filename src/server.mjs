@@ -135,6 +135,41 @@ async function handleRequest(req, res) {
     return json(res, data);
   }
 
+  // GET /api/settings?scope=<id> — structured settings for a scope
+  if (path === "/api/settings" && req.method === "GET") {
+    const scopeId = url.searchParams.get("scope");
+    if (!scopeId) return json(res, { ok: false, error: "Missing scope parameter" }, 400);
+
+    if (!cachedData) await freshScan();
+
+    const records = cachedData.items.filter(
+      i => i.category === "setting" && i.scopeId === scopeId
+    );
+
+    // Group records by settingGroup
+    const groups = {};
+    for (const r of records) {
+      const g = r.settingGroup || "other";
+      if (!groups[g]) groups[g] = [];
+      groups[g].push(r);
+    }
+
+    // Collect distinct source files for this scope
+    const sourceMap = new Map();
+    for (const r of records) {
+      if (!sourceMap.has(r.sourceFile)) {
+        sourceMap.set(r.sourceFile, { file: r.sourceFile, tier: r.sourceTier });
+      }
+    }
+
+    return json(res, {
+      scopeId,
+      sources: [...sourceMap.values()],
+      records,
+      groups,
+    });
+  }
+
   // ── Context Budget helpers ──────────────────────────────────────────
 
   /**

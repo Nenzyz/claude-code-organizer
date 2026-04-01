@@ -715,6 +715,116 @@ async function scanHooks(scope) {
   return items;
 }
 
+// ── Settings parser ──────────────────────────────────────────────────
+
+const SETTING_KEY_GROUP = {
+  // permissions — expanded to sub-keys in emitSettingRecords
+  permissions: "permissions",
+  // mcp (mcpServers skipped — handled by scanMcpServers)
+  allowedMcpServers: "mcp",
+  deniedMcpServers: "mcp",
+  enabledMcpjsonServers: "mcp",
+  disabledMcpjsonServers: "mcp",
+  // runtime
+  outputStyle: "runtime",
+  language: "runtime",
+  statusLine: "runtime",
+  fastMode: "runtime",
+  fastModePerSessionOptIn: "runtime",
+  effortLevel: "runtime",
+  sandbox: "runtime",
+  assistant: "runtime",
+  assistantName: "runtime",
+  channelsEnabled: "runtime",
+  allowedChannelPlugins: "runtime",
+  worktree: "runtime",
+  remote: "runtime",
+  // memory
+  autoMemoryEnabled: "memory",
+  autoMemoryDirectory: "memory",
+  autoDreamEnabled: "memory",
+  plansDirectory: "memory",
+  // plugins
+  enabledPlugins: "plugins",
+  pluginConfigs: "plugins",
+  extraKnownMarketplaces: "plugins",
+  strictKnownMarketplaces: "plugins",
+  blockedMarketplaces: "plugins",
+};
+
+function getValueType(v) {
+  if (v === null) return "null";
+  if (Array.isArray(v)) return "array";
+  return typeof v;
+}
+
+function emitSettingRecords(settings, scopeId, sourceFile, sourceTier) {
+  const records = [];
+  for (const [key, value] of Object.entries(settings)) {
+    // hooks already handled by scanHooks — skip
+    if (key === "hooks") continue;
+    // mcpServers already handled by scanMcpServers — skip
+    if (key === "mcpServers") continue;
+
+    // permissions: expand to permissions.allow / .deny / .ask sub-records
+    if (key === "permissions" && value && typeof value === "object" && !Array.isArray(value)) {
+      for (const [subKey, subValue] of Object.entries(value)) {
+        records.push({
+          category: "setting",
+          scopeId,
+          name: `permissions.${subKey}`,
+          value: subValue,
+          valueType: getValueType(subValue),
+          sourceFile,
+          sourceTier,
+          settingGroup: "permissions",
+          locked: true,
+        });
+      }
+      continue;
+    }
+
+    records.push({
+      category: "setting",
+      scopeId,
+      name: key,
+      value,
+      valueType: getValueType(value),
+      sourceFile,
+      sourceTier,
+      settingGroup: SETTING_KEY_GROUP[key] || "other",
+      locked: true,
+    });
+  }
+  return records;
+}
+
+async function scanSettings(scope) {
+  const sources = scope.id === "global"
+    ? [
+        { path: join(CLAUDE_DIR, "settings.json"), sourceFile: "settings.json", sourceTier: "user" },
+        { path: join(CLAUDE_DIR, "settings.local.json"), sourceFile: "settings.local.json", sourceTier: "local" },
+        { path: join(MANAGED_DIR, "managed-settings.json"), sourceFile: "managed-settings.json", sourceTier: "managed" },
+      ]
+    : (scope.repoDir && !isGlobalClaudeDir(scope))
+      ? [
+          { path: join(scope.repoDir, ".claude", "settings.json"), sourceFile: "settings.json", sourceTier: "project" },
+          { path: join(scope.repoDir, ".claude", "settings.local.json"), sourceFile: "settings.local.json", sourceTier: "local" },
+        ]
+      : [];
+
+  const records = [];
+  for (const source of sources) {
+    const content = await safeReadFile(source.path);
+    if (!content) continue;
+    try {
+      const settings = JSON.parse(content);
+      records.push(...emitSettingRecords(settings, scope.id, source.sourceFile, source.sourceTier));
+    } catch {}
+  }
+  return records;
+}
+
 async function scanPlugins() {
   const items = [];
   const cacheDir = join(CLAUDE_DIR, "plugins", "cache");
@@ -1010,7 +1120,7 @@ export async function scan() {
 
   // Scan per-scope items
   for (const scope of scopes) {
-    const [memories, skills, mcpServers, configs, hooks, plans, sessions, rules, commands, agents] = await Promise.all([
+    const [memories, skills, mcpServers, configs, hooks, plans, sessions, rules, commands, agents, settings] = await Promise.all([
       scanMemories(scope),
       scanSkills(scope),
       scanMcpServers(scope),
@@ -1021,8 +1131,9 @@ export async function scan() {
       scanRules(scope),
       scanCommands(scope),
       scanAgents(scope),
+      scanSettings(scope),
     ]);
-    allItems.push(...memories, ...skills, ...mcpServers, ...configs, ...hooks, ...plans, ...sessions, ...rules, ...commands, ...agents);
+    allItems.push(...memories, ...skills, ...mcpServers, ...configs, ...hooks, ...plans, ...sessions, ...rules, ...commands, ...agents, ...settings);
   }
 
   // Scan global-only items

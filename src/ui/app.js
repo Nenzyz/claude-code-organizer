@@ -41,7 +41,7 @@ const uiState = {
   sortBy: {}, // { [catKey]: { field: "size"|"date"|"name", dir: "asc"|"desc" } }
 };
 
-const CATEGORY_ORDER = ["skill", "memory", "mcp", "command", "agent", "plan", "rule", "config", "hook", "plugin", "session"];
+const CATEGORY_ORDER = ["skill", "memory", "mcp", "command", "agent", "plan", "rule", "config", "hook", "plugin", "session", "setting"];
 
 const CATEGORIES = {
   memory: { icon: "🧠", label: "Memories", filterLabel: "Memories", group: "memory" },
@@ -55,6 +55,7 @@ const CATEGORIES = {
   config: { icon: "⚙️", label: "Config",   filterLabel: "Config",  group: null },
   hook:   { icon: "🪝", label: "Hooks",    filterLabel: "Hooks",   group: null },
   plugin: { icon: "🧩", label: "Plugins",  filterLabel: "Plugins", group: null },
+  setting:{ icon: "🔧", label: "Settings", filterLabel: "Settings", group: null },
 };
 
 const ITEM_ICONS = {
@@ -69,6 +70,7 @@ const ITEM_ICONS = {
   config: "⚙️",
   hook: "🪝",
   plugin: "🧩",
+  setting: "🔧",
 };
 
 const SCOPE_ICONS = {
@@ -92,6 +94,7 @@ const BADGE_CLASS = {
   command: "ib-skill",
   agent: "ib-mcp",
   rule: "ib-config",
+  setting: "ib-config",
 };
 
 /**
@@ -903,6 +906,14 @@ function renderSkillCategory(scopeId, group, items) {
   return html;
 }
 
+function renderSettingValuePreview(item) {
+  const v = item.value;
+  if (v === null || v === undefined) return "—";
+  if (Array.isArray(v)) return v.length === 0 ? "(empty array)" : `[${v.slice(0, 3).map(x => JSON.stringify(x)).join(", ")}${v.length > 3 ? ", …" : ""}]`;
+  if (typeof v === "object") return "{…}";
+  return String(v);
+}
+
 function renderItem(item) {
   const icon = ITEM_ICONS[item.category] || "📄";
   const key = itemKey(item);
@@ -912,7 +923,9 @@ function renderItem(item) {
   const checkbox = item.locked ? "" : `<input type="checkbox" class="item-chk" data-item-key="${esc(key)}"${checked}>`;
   const dateLabel = formatShortDate(item.mtime || item.ctime);
   const sizeLabel = item.size || "—";
-  const desc = item.description || item.fileName || item.path || "No description";
+  const desc = item.category === "setting"
+    ? renderSettingValuePreview(item)
+    : (item.description || item.fileName || item.path || "No description");
 
   // Effective-mode status badges
   const isFromGlobal   = showEffective && item.scopeId === "global" && selectedScopeId !== "global";
@@ -958,7 +971,10 @@ function renderItem(item) {
       ${badgeHtml}
       <span class="item-desc">${item.category === "mcp" ? "" : esc(desc)}</span>
       ${actions}
-      ${item.category === "mcp" ? "" : `<div class="item-right">
+      ${item.category === "mcp" ? "" : item.category === "setting" ? `<div class="item-right">
+        <span class="item-size">${esc(item.settingGroup || "")}</span>
+        <span class="item-date">${esc(item.sourceTier || "")}</span>
+      </div>` : `<div class="item-right">
         <span class="item-size">${esc(sizeLabel)}</span>
         <span class="item-date">${esc(dateLabel)}</span>
       </div>`}
@@ -1003,12 +1019,22 @@ function renderDetailPanel(resetPreview = false) {
   crumb.innerHTML = renderBreadcrumb(scope);
   scopeEl.textContent = scope ? capitalize(scope.name) : selectedItem.scopeId;
   type.innerHTML = renderBadge(selectedItem, true);
-  desc.textContent = selectedItem.description || "—";
-  size.textContent = selectedItem.size || "—";
-  dates.innerHTML = `
-    <div class="d-info-cell"><span class="d-info-label">Created</span><span class="d-info-val">${esc(formatShortDate(selectedItem.ctime) || "—")}</span></div>
-    <div class="d-info-cell"><span class="d-info-label">Modified</span><span class="d-info-val">${esc(formatShortDate(selectedItem.mtime) || "—")}</span></div>`;
-  path.textContent = selectedItem.path || "—";
+
+  if (selectedItem.category === "setting") {
+    desc.textContent = selectedItem.settingGroup ? `Group: ${selectedItem.settingGroup}` : "—";
+    size.textContent = selectedItem.valueType || "—";
+    dates.innerHTML = `
+      <div class="d-info-cell"><span class="d-info-label">Source</span><span class="d-info-val">${esc(selectedItem.sourceFile || "—")}</span></div>
+      <div class="d-info-cell"><span class="d-info-label">Tier</span><span class="d-info-val">${esc(selectedItem.sourceTier || "—")}</span></div>`;
+    path.textContent = selectedItem.sourceFile || "—";
+  } else {
+    desc.textContent = selectedItem.description || "—";
+    size.textContent = selectedItem.size || "—";
+    dates.innerHTML = `
+      <div class="d-info-cell"><span class="d-info-label">Created</span><span class="d-info-val">${esc(formatShortDate(selectedItem.ctime) || "—")}</span></div>
+      <div class="d-info-cell"><span class="d-info-label">Modified</span><span class="d-info-val">${esc(formatShortDate(selectedItem.mtime) || "—")}</span></div>`;
+    path.textContent = selectedItem.path || "—";
+  }
 
   openBtn.disabled = false;
   moveBtn.disabled = false; // always enabled — locked items use CC prompt instead of API
@@ -1100,6 +1126,12 @@ function renderEffectiveBehavior(item) {
           ? "This memory is stored globally and is accessible in all projects."
           : "This memory is stored in this project's memory directory.";
       break;
+    case "setting": {
+      const tierOrder = { managed: "highest", local: "high", project: "medium", user: "lowest" };
+      const tierDesc = tierOrder[item.sourceTier] || item.sourceTier;
+      why = `From ${item.sourceFile || "unknown"} (${item.sourceTier || "?"} tier — ${tierDesc} priority). Precedence order: managed > local > project > user.`;
+      break;
+    }
     default:
       why = getEffectiveRule(item.category) || "";
   }
@@ -1821,6 +1853,12 @@ async function loadPreview(item) {
   const currentKey = itemKey(item);
 
   try {
+    if (item.category === "setting") {
+      if (currentKey !== detailPreviewKey) return;
+      preview.textContent = JSON.stringify(item.value, null, 2);
+      return;
+    }
+
     if (item.category === "mcp") {
       if (currentKey !== detailPreviewKey) return;
       preview.textContent = JSON.stringify(item.mcpConfig || {}, null, 2);
