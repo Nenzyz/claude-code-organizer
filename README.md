@@ -11,7 +11,9 @@
 [![MCP Security](https://img.shields.io/badge/MCP-Security%20Scanner-red)](https://github.com/mcpware/claude-code-organizer)
 English | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [廣東話](README.zh-HK.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Bahasa Indonesia](README.id.md) | [Italiano](README.it.md) | [Português](README.pt-BR.md) | [Türkçe](README.tr.md) | [Tiếng Việt](README.vi.md) | [ไทย](README.th.md)
 
-**One dashboard to see everything Claude Code loads into context — scan for poisoned MCP servers, reclaim wasted tokens, and fix misplaced configs. All without leaving the window.**
+**Claude Code Organizer (CCO)** is a free, open-source dashboard that lets you manage all Claude Code configuration — memories, skills, MCP servers, settings, agents, rules, and hooks — across global and project scopes. It includes a security scanner for MCP tool poisoning and prompt injection, a per-item context token budget tracker, and bulk cleanup for duplicate configs. All without leaving the window.
+
+> Scan for poisoned MCP servers. Reclaim wasted context tokens. Find and delete duplicate memories. Move misplaced configs where they belong.
 
 > **Privacy:** CCO reads Claude Code config files on your machine (global and project-level). Nothing is sent externally. Zero telemetry.
 
@@ -68,7 +70,7 @@ Or run directly: `npx @mcpware/claude-code-organizer`
 | Zero-install (`npx`) | **Yes** | Varies | No (Tauri/Electron) | No (VS Code) |
 | MCP tools (AI-accessible) | **Yes** | No | No | No |
 
-## Know What's Eating Your Context
+## Context Budget: See How Many Tokens Claude Code Pre-Loads
 
 Your context window is not 200K tokens. It's 200K minus everything Claude pre-loads — and duplicates make it worse.
 
@@ -82,7 +84,7 @@ Your context window is not 200K tokens. It's 200K minus everything Claude pre-lo
 - 200K / 1M context window toggle
 - Per-category breakdown — see exactly what loads and where it comes from
 
-## See What Claude Actually Loads
+## Config Viewer: See What Claude Code Actually Loads Per Project
 
 Claude Code doesn't use one universal rule for everything. Each category has its own:
 
@@ -103,7 +105,7 @@ Teams installed twice, Gmail three times, Playwright three times. You configured
 - **Bulk operations** — Select mode: tick multiple items, move or delete all at once.
 - **Flat or Tree view** — Default flat view lists all projects equally. Toggle tree view (🌲) to inspect filesystem structure.
 
-## Catch Poisoned Tools Before They Catch You
+## MCP Security Scanner: Detect Tool Poisoning and Prompt Injection
 
 Every MCP server you install exposes tool descriptions that go straight into Claude's prompt. A compromised server can embed hidden instructions you'd never see.
 
@@ -166,6 +168,40 @@ Have a feature idea? [Open an issue](https://github.com/mcpware/claude-code-orga
 ## Community
 
 **[Watch the walkthrough on YouTube](https://www.youtube.com/watch?v=UAQsHwNHfcw)** — community demo by AI Coding Daily (covers an earlier version of CCO).
+
+## Frequently Asked Questions
+
+### How do I see what Claude Code loads into context?
+
+Run `npx @mcpware/claude-code-organizer` and click **Show Effective** on any category. CCO scans all config files across global and project scopes and shows exactly what Claude pre-loads — memories, MCP tool schemas, rules, skills, and settings — with per-item token counts.
+
+### How do I find and delete duplicate memories in Claude Code?
+
+CCO groups all items by category across every project. If you have the same memory defined in both global and project scope, or three copies of the same MCP server, CCO surfaces them with `SHADOWED` and `⚠ CONFLICT` badges. Select the duplicates and bulk-delete in one click.
+
+### How do I scan MCP servers for security issues?
+
+Open CCO and click the security scan button. It connects to every configured MCP server, retrieves actual tool definitions, and runs them through 60 detection patterns and 9 deobfuscation techniques. Findings are clickable — jump directly to the server entry to inspect, move, or delete it.
+
+### Why is my Claude Code context window running out?
+
+Claude pre-loads memories, CLAUDE.md files, MCP tool schemas, and settings before you type anything. CCO's Context Budget view shows the exact token count per item, split by always-loaded vs deferred. Common culprits: duplicate MCP servers (each loads its full tool schema), large CLAUDE.md with @imports, and stale memories across multiple projects.
+
+### How do I manage Claude Code settings across multiple projects?
+
+CCO scans `~/.claude/` and discovers all projects automatically. The scope list shows global vs project-level items side by side. You can move items between scopes (e.g., promote a project memory to global), see precedence rules per category, and clean up configs that were installed in the wrong scope.
+
+### Does CCO send my data anywhere?
+
+No. CCO reads config files on your local machine only. Zero telemetry, zero network calls (except connecting to your own locally-configured MCP servers during security scans). Fully offline dashboard.
+
+### How is CCO different from standalone MCP scanners?
+
+Standalone scanners only scan — they report findings but you still have to manually find and edit the config files. CCO integrates scan → navigate → fix in one flow. Click a security finding and you land directly on the MCP server entry. Delete it, move it, or inspect its config without switching tools.
+
+### Can I use CCO in CI/CD pipelines?
+
+Not yet — headless CLI mode (`cco scan --json`) is on the roadmap. Currently CCO runs as an interactive browser dashboard.
 
 ## License
 
