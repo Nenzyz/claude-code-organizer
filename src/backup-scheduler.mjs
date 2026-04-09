@@ -6,7 +6,7 @@
 import { writeFile, mkdir, unlink, access, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir, platform } from "node:os";
-import { execFile } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import { promisify } from "node:util";
 
 const exec = promisify(execFile);
@@ -20,12 +20,13 @@ function systemdDir() {
 }
 
 function serviceContent() {
+  const cmd = resolveCliCommand();
   return `[Unit]
 Description=Claude Code Backup — scan and push settings to GitHub
 
 [Service]
 Type=oneshot
-ExecStart=npx @mcpware/claude-code-organizer --backup run --quiet
+ExecStart=${cmd.join(" ")}
 Environment=HOME=${HOME}
 Environment=PATH=${process.env.PATH}
 `;
@@ -100,13 +101,19 @@ function plistLabel() {
   return `com.mcpware.${SERVICE_NAME}`;
 }
 
-function npxPath() {
-  // Resolve npx from the same directory as the current node binary
-  const nodeDir = process.execPath.replace(/\/[^/]+$/, "");
-  return join(nodeDir, "npx");
+function resolveCliCommand() {
+  // Prefer the globally installed binary over npx (npx may cache old versions)
+  try {
+    const globalBin = execFileSync("which", ["claude-code-organizer"], { encoding: "utf-8" }).trim();
+    if (globalBin) return [globalBin, "--backup", "run", "--quiet"];
+  } catch {}
+  // Fallback to node + cli.mjs from this package
+  const cliPath = join(import.meta.dirname, "..", "bin", "cli.mjs");
+  return [process.execPath, cliPath, "--backup", "run", "--quiet"];
 }
 
 function plistContent(intervalSeconds) {
+  const cmd = resolveCliCommand();
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -115,11 +122,7 @@ function plistContent(intervalSeconds) {
   <string>${plistLabel()}</string>
   <key>ProgramArguments</key>
   <array>
-    <string>${npxPath()}</string>
-    <string>@mcpware/claude-code-organizer</string>
-    <string>--backup</string>
-    <string>run</string>
-    <string>--quiet</string>
+${cmd.map(a => `    <string>${a}</string>`).join("\n")}
   </array>
   <key>StartInterval</key>
   <integer>${intervalSeconds}</integer>
