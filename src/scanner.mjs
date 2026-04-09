@@ -13,6 +13,10 @@ export {
   setDisabledMcpServers,
   scanMcpPolicy,
   checkMcpPolicy,
+  getArchivedMcpServers,
+  archiveMcpServer,
+  restoreMcpServer,
+  copyArchivedToProject,
 } from "./harness/adapters/claude.mjs";
 
 export { getAdapter, getDefaultAdapterId, listAdapters };
