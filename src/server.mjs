@@ -1027,12 +1027,12 @@ async function handleRequest(req, res) {
     try {
       const { intervalHours = 4 } = await readBody(req);
       const { readFile: rf, writeFile: wf } = await import("node:fs/promises");
-      const { install, getNodeAndCliPath } = await import("./backup-scheduler.mjs");
+      const { install } = await import("./backup-scheduler.mjs");
 
-      const paths = await getNodeAndCliPath();
-      if (!paths) return json(res, { ok: false, error: "Backup scheduler not initialized. Run `npx @mcpware/claude-code-organizer --backup init` first." }, 400);
+      const nodePath = process.execPath;
+      const cliPath = join(import.meta.dirname, "..", "bin", "cli.mjs");
 
-      await install(paths.nodePath, paths.cliPath, intervalHours);
+      await install(nodePath, cliPath, intervalHours);
 
       let config = {};
       try { config = JSON.parse(await rf(BACKUP_CONFIG, "utf-8")); } catch {}

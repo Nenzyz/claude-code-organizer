@@ -25,7 +25,7 @@ Description=Claude Code Backup — scan and push settings to GitHub
 
 [Service]
 Type=oneshot
-ExecStart=${nodePath} ${cliPath} run --quiet
+ExecStart=${nodePath} ${cliPath} --backup run --quiet
 Environment=HOME=${HOME}
 `;
 }
@@ -119,6 +119,7 @@ function plistContent(nodePath, cliPath, intervalSeconds) {
   <array>
     <string>${nodePath}</string>
     <string>${cliPath}</string>
+    <string>--backup</string>
     <string>run</string>
     <string>--quiet</string>
   </array>
