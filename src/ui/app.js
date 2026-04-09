@@ -99,8 +99,28 @@ const BADGE_CLASS = {
   setting: "ib-config",
 };
 
+/* ── Editor Configuration ──────────────────────────────────── */
+const EDITORS = {
+  vscode:   { label: "VS Code",   scheme: "vscode://file" },
+  cursor:   { label: "Cursor",    scheme: "cursor://file" },
+  windsurf: { label: "Windsurf",  scheme: "windsurf://file" },
+  zed:      { label: "Zed",       scheme: "zed://file" },
+};
+const EDITOR_STORAGE_KEY = "cco-preferred-editor";
+const DEFAULT_EDITOR = "vscode";
+
+function getPreferredEditor() {
+  const stored = localStorage.getItem(EDITOR_STORAGE_KEY);
+  return stored && EDITORS[stored] ? stored : DEFAULT_EDITOR;
+}
+
+function setPreferredEditor(editorId) {
+  if (!EDITORS[editorId]) return;
+  localStorage.setItem(EDITOR_STORAGE_KEY, editorId);
+}
+
 /**
- * Open a file in VS Code via URI scheme.
+ * Open a file in the preferred editor via URI scheme.
  * Handles Windows paths (C:\foo\bar → /C:/foo/bar) and
  * directories (skills are folders, open SKILL.md inside).
  */
@@ -111,7 +131,7 @@ function openInEditor(filePath) {
   if (/^[A-Z]:/i.test(p)) p = "/" + p;
   // Skills are directories — try opening SKILL.md inside
   if (!p.match(/\.\w+$/)) p = p.replace(/\/$/, "") + "/SKILL.md";
-  window.open(`vscode://file${p}`, "_blank");
+  window.open(`${EDITORS[getPreferredEditor()].scheme}${p}`, "_blank");
 }
 
 const SHORT_DATE = new Intl.DateTimeFormat("en-US", {
@@ -259,6 +279,39 @@ function setupUi() {
   setupResizers();
   setupSecurityScan();
   setupMcpControls();
+  setupEditorPicker();
+}
+
+function setupEditorPicker() {
+  const btn = document.getElementById("editorSettingsBtn");
+  const picker = document.getElementById("editorPicker");
+  if (!btn || !picker) return;
+
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    // Populate picker items from EDITORS registry
+    const current = getPreferredEditor();
+    picker.innerHTML = Object.entries(EDITORS).map(([id, ed]) =>
+      `<div class="editor-picker-item${id === current ? " active" : ""}" data-editor="${id}">${id === current ? "\u2713 " : "\u2003 "}${ed.label}</div>`
+    ).join("");
+    picker.classList.toggle("hidden");
+  });
+
+  picker.addEventListener("click", (e) => {
+    const item = e.target.closest(".editor-picker-item");
+    if (!item) return;
+    const editorId = item.dataset.editor;
+    setPreferredEditor(editorId);
+    picker.classList.add("hidden");
+    toast(`Editor set to ${EDITORS[editorId].label}`);
+  });
+
+  // Click-outside dismiss
+  document.addEventListener("click", (e) => {
+    if (!picker.classList.contains("hidden") && !picker.contains(e.target) && e.target !== btn) {
+      picker.classList.add("hidden");
+    }
+  });
 }
 
 function setupSearch() {
