@@ -936,7 +936,7 @@ async function handleRequest(req, res) {
       }
 
       const paths = await getNodeAndCliPath();
-      if (!paths) return json(res, { ok: false, error: "Backup scheduler not initialized. Run `claude-code-backup init` first." }, 400);
+      if (!paths) return json(res, { ok: false, error: "Backup scheduler not initialized. Run `npx @mcpware/claude-code-organizer --backup init` first." }, 400);
 
       await install(paths.nodePath, paths.cliPath, intervalHours);
 
