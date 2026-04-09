@@ -935,10 +935,7 @@ async function handleRequest(req, res) {
         return json(res, { ok: false, error: "Background scheduler is currently available for Claude Code backups only." }, 400);
       }
 
-      const nodePath = process.execPath;
-      const cliPath = join(import.meta.dirname, "..", "bin", "cli.mjs");
-
-      await install(nodePath, cliPath, intervalHours);
+      await install(intervalHours);
 
       let config = {};
       try { config = JSON.parse(await rf(backupConfig, "utf-8")); } catch {}
