@@ -10,7 +10,7 @@ import { join, extname, resolve, dirname, sep, isAbsolute } from "node:path";
 import { homedir } from "node:os";
 import { createRequire } from "node:module";
 import https from "node:https";
-import { scan, scanMcpPolicy, checkMcpPolicy, getDisabledMcpServers, setDisabledMcpServers } from "./scanner.mjs";
+import { scan, scanMcpPolicy, checkMcpPolicy, getDisabledMcpServers, setDisabledMcpServers, archiveMcpServer, restoreMcpServer, copyArchivedToProject } from "./scanner.mjs";
 import { moveItem, deleteItem, getValidDestinations } from "./mover.mjs";
 import { countTokens, getMethod } from "./tokenizer.mjs";
 import { introspectServers } from "./mcp-introspector.mjs";
@@ -1106,14 +1106,54 @@ async function handleRequest(req, res) {
     }
   }
 
-  // ── MCP Policy API ─────────────────────────────────────────────────
+  // ── MCP Archive API ─────────────────────────────────────────────
+
+  // POST /api/mcp-archive — archive or restore a global MCP server
+  if (path === "/api/mcp-archive" && req.method === "POST") {
+    try {
+      const body = await readBody(req);
+      const { serverName, action } = body;
+      if (!serverName || !action) return json(res, { ok: false, error: "Missing serverName or action" }, 400);
+
+      let result;
+      if (action === "archive") {
+        result = await archiveMcpServer(serverName);
+      } else if (action === "restore") {
+        result = await restoreMcpServer(serverName);
+      } else {
+        return json(res, { ok: false, error: `Unknown action: ${action}` }, 400);
+      }
+
+      if (result.ok) cachedData = null;
+      return json(res, result);
+    } catch (err) {
+      return json(res, { ok: false, error: err.message }, 500);
+    }
+  }
+
+  // POST /api/mcp-archive-copy — copy an archived server to a project
+  if (path === "/api/mcp-archive-copy" && req.method === "POST") {
+    try {
+      const body = await readBody(req);
+      const { serverName, projectPath } = body;
+      if (!serverName || !projectPath) return json(res, { ok: false, error: "Missing serverName or projectPath" }, 400);
+
+      const result = await copyArchivedToProject(serverName, projectPath);
+      if (result.ok) cachedData = null;
+      return json(res, result);
+    } catch (err) {
+      return json(res, { ok: false, error: err.message }, 500);
+    }
+  }
+
+    // ── MCP Policy API ─────────────────────────────────────────────────
 
   // GET /api/mcp-policy — return allowlist/denylist + per-server policy status
   if (path === "/api/mcp-policy" && req.method === "GET") {
     try {
       if (!cachedData) await freshScan();
       const policy = await scanMcpPolicy();
-      const mcpItems = cachedData.items.filter(i => i.category === "mcp" && i.mcpConfig);
+      const mcpItems = cachedData.items.filter(i => i.category === "mcp" && i.mcpConfig && !i.archived);
       const serverStatuses = mcpItems.map(item => ({
         name: item.name,
         scopeId: item.scopeId,
@@ -1175,7 +1215,7 @@ async function handleRequest(req, res) {
       if (!cachedData) await freshScan();
 
       // Get all MCP server items from scan data
-      const mcpItems = cachedData.items.filter(i => i.category === "mcp" && i.mcpConfig);
+      const mcpItems = cachedData.items.filter(i => i.category === "mcp" && i.mcpConfig && !i.archived);
 
       // Phase 1: Introspect MCP servers to get tool definitions
       const introspectionResults = await introspectServers(mcpItems);
@@ -1222,7 +1262,7 @@ async function handleRequest(req, res) {
   if (path === "/api/security-baseline-check" && req.method === "GET") {
     try {
       if (!cachedData) await freshScan();
-      const mcpNames = new Set(cachedData.items.filter(i => i.category === "mcp" && i.mcpConfig).map(i => i.name));
+      const mcpNames = new Set(cachedData.items.filter(i => i.category === "mcp" && i.mcpConfig && !i.archived).map(i => i.name));
       const { loadBaselines } = await import("./security-scanner.mjs");
       const baselines = await loadBaselines();
       const baselineNames = new Set(Object.keys(baselines));

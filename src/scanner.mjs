@@ -622,6 +622,42 @@ async function scanMcpServers(scope) {
     } catch {}
   }
 
+
+  // Scan archived MCP servers from ~/.claude/.mcp-archive.json (global scope only)
+  if (scope.id === "global") {
+    const archivePath = join(CLAUDE_DIR, ".mcp-archive.json");
+    const archiveContent = await safeReadFile(archivePath);
+    if (archiveContent) {
+      const archiveStat = await safeStat(archivePath);
+      try {
+        const archiveConfig = JSON.parse(archiveContent);
+        const servers = archiveConfig.mcpServers || {};
+        for (const [name, serverConfig] of Object.entries(servers)) {
+          if (!serverConfig || typeof serverConfig !== "object") continue;
+          const cmd = serverConfig.command || serverConfig.url || "";
+          const args = serverConfig.args || [];
+          const desc = [cmd, ...args].filter(Boolean).join(" ").slice(0, 100);
+          const cfgBytes = JSON.stringify(serverConfig).length;
+          items.push({
+            category: "mcp",
+            scopeId: scope.id,
+            name,
+            fileName: ".mcp-archive.json",
+            description: desc || "(HTTP MCP)",
+            subType: "mcp",
+            size: formatSize(cfgBytes),
+            sizeBytes: cfgBytes,
+            mtime: archiveStat ? archiveStat.mtime.toISOString().slice(0, 16) : "",
+            ctime: archiveStat ? archiveStat.birthtime.toISOString().slice(0, 16) : "",
+            path: archivePath,
+            mcpConfig: serverConfig,
+            archived: true,
+          });
+        }
+      } catch {}
+    }
+  }
+
   // Add approval state for project-scoped servers from .mcp.json
   // Mirrors ccsrc getProjectMcpServerStatus: approved/rejected/pending
   // CC merges settings from multiple sources; read both settings.json and
@@ -1280,6 +1316,186 @@ export async function setDisabledMcpServers(projectPath, disabledList) {
   const { writeFile: wf } = await import("node:fs/promises");
   await wf(claudeJsonPath, JSON.stringify(config, null, 2) + "\n");
 }
+
+// ── MCP Archive Helpers ─────────────────────────────────────────────
+
+const MCP_ARCHIVE_PATH = join(CLAUDE_DIR, ".mcp-archive.json");
+
+/**
+ * Read archived MCP servers from ~/.claude/.mcp-archive.json.
+ * Returns the mcpServers object. Defensive: try/catch, return {} on failure.
+ */
+export async function getArchivedMcpServers() {
+  try {
+    const raw = await readFile(MCP_ARCHIVE_PATH, "utf-8");
+    const config = JSON.parse(raw);
+    return config.mcpServers || {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Archive a global MCP server — move it from its source file to ~/.claude/.mcp-archive.json.
+ * Atomic: write to archive first, then remove from source.
+ */
+export async function archiveMcpServer(serverName) {
+  const { writeFile: wf, mkdir: mkd } = await import("node:fs/promises");
+  const { dirname: dn } = await import("node:path");
+
+  // Global source files to check
+  const globalSources = [
+    { path: join(CLAUDE_DIR, ".mcp.json"), key: null },
+    { path: join(HOME, ".mcp.json"), key: null },
+    { path: join(HOME, ".claude.json"), key: "mcpServers" },
+  ];
+
+  // Find which source file contains this server
+  let sourceFile = null;
+  let sourceContent = null;
+  let serverConfig = null;
+  let isClaudeJson = false;
+
+  for (const src of globalSources) {
+    const raw = await safeReadFile(src.path);
+    if (!raw) continue;
+    try {
+      const parsed = JSON.parse(raw);
+      const servers = parsed.mcpServers || {};
+      if (servers[serverName]) {
+        sourceFile = src.path;
+        sourceContent = parsed;
+        serverConfig = servers[serverName];
+        isClaudeJson = src.path.endsWith(".claude.json");
+        break;
+      }
+    } catch { continue; }
+  }
+
+  if (!serverConfig) {
+    return { ok: false, error: `Server "${serverName}" not found in any global MCP source` };
+  }
+
+  // Read or create archive file
+  let archive = { mcpServers: {} };
+  try {
+    archive = JSON.parse(await readFile(MCP_ARCHIVE_PATH, "utf-8"));
+    if (!archive.mcpServers) archive.mcpServers = {};
+  } catch { /* file doesn't exist or invalid, start fresh */ }
+
+  // Write to archive first (atomic safety)
+  archive.mcpServers[serverName] = serverConfig;
+  await mkd(dn(MCP_ARCHIVE_PATH), { recursive: true });
+  await wf(MCP_ARCHIVE_PATH, JSON.stringify(archive, null, 2) + "\n");
+
+  // Remove from source
+  delete sourceContent.mcpServers[serverName];
+  await wf(sourceFile, JSON.stringify(sourceContent, null, 2) + "\n");
+
+  return { ok: true, message: `Archived MCP server "${serverName}"` };
+}
+
+/**
+ * Restore an archived MCP server — move it from archive back to ~/.claude/.mcp.json.
+ * Atomic: write to destination first, then remove from archive.
+ */
+export async function restoreMcpServer(serverName) {
+  const { writeFile: wf, mkdir: mkd } = await import("node:fs/promises");
+  const { dirname: dn } = await import("node:path");
+
+  // Read archive
+  let archive;
+  try {
+    archive = JSON.parse(await readFile(MCP_ARCHIVE_PATH, "utf-8"));
+  } catch {
+    return { ok: false, error: "Archive file not found or invalid" };
+  }
+
+  const serverConfig = archive.mcpServers?.[serverName];
+  if (!serverConfig) {
+    return { ok: false, error: `Server "${serverName}" not found in archive` };
+  }
+
+  // Check for duplicates in all global sources
+  const globalSources = [
+    join(CLAUDE_DIR, ".mcp.json"),
+    join(HOME, ".mcp.json"),
+    join(HOME, ".claude.json"),
+  ];
+
+  for (const srcPath of globalSources) {
+    const raw = await safeReadFile(srcPath);
+    if (!raw) continue;
+    try {
+      const parsed = JSON.parse(raw);
+      const servers = parsed.mcpServers || {};
+      if (servers[serverName]) {
+        return { ok: false, error: `Server "${serverName}" already exists in ${srcPath}` };
+      }
+    } catch { continue; }
+  }
+
+  // Write to ~/.claude/.mcp.json (canonical location)
+  const destPath = join(CLAUDE_DIR, ".mcp.json");
+  let destContent = { mcpServers: {} };
+  try {
+    destContent = JSON.parse(await readFile(destPath, "utf-8"));
+    if (!destContent.mcpServers) destContent.mcpServers = {};
+  } catch { /* new file */ }
+
+  // Write destination first (atomic safety)
+  destContent.mcpServers[serverName] = serverConfig;
+  await mkd(dn(destPath), { recursive: true });
+  await wf(destPath, JSON.stringify(destContent, null, 2) + "\n");
+
+  // Remove from archive
+  delete archive.mcpServers[serverName];
+  await wf(MCP_ARCHIVE_PATH, JSON.stringify(archive, null, 2) + "\n");
+
+  return { ok: true, message: `Restored MCP server "${serverName}" to ~/.claude/.mcp.json` };
+}
+
+/**
+ * Copy an archived MCP server config to a project's .mcp.json.
+ * Does NOT remove from archive — server stays archived.
+ */
+export async function copyArchivedToProject(serverName, projectPath) {
+  const { writeFile: wf, mkdir: mkd } = await import("node:fs/promises");
+  const { dirname: dn, join: pjoin } = await import("node:path");
+
+  // Read archive
+  let archive;
+  try {
+    archive = JSON.parse(await readFile(MCP_ARCHIVE_PATH, "utf-8"));
+  } catch {
+    return { ok: false, error: "Archive file not found or invalid" };
+  }
+
+  const serverConfig = archive.mcpServers?.[serverName];
+  if (!serverConfig) {
+    return { ok: false, error: `Server "${serverName}" not found in archive` };
+  }
+
+  // Check for duplicate in target project .mcp.json
+  const targetPath = pjoin(projectPath, ".mcp.json");
+  let targetContent = { mcpServers: {} };
+  try {
+    targetContent = JSON.parse(await readFile(targetPath, "utf-8"));
+    if (!targetContent.mcpServers) targetContent.mcpServers = {};
+  } catch { /* new file */ }
+
+  if (targetContent.mcpServers[serverName]) {
+    return { ok: false, error: `Server "${serverName}" already exists in ${targetPath}` };
+  }
+
+  // Write to project .mcp.json
+  targetContent.mcpServers[serverName] = serverConfig;
+  await mkd(dn(targetPath), { recursive: true });
+  await wf(targetPath, JSON.stringify(targetContent, null, 2) + "\n");
+
+  return { ok: true, message: `Copied archived server "${serverName}" to ${targetPath}` };
+}
+
 
 /**
  * Scan MCP allowlist/denylist policy from settings files.

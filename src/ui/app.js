@@ -418,6 +418,23 @@ function setupItemList() {
         return;
       }
 
+      // MCP archive/restore/copy-to-project actions
+      if (actionBtn.dataset.action === "mcp-archive") {
+        const mcpName = actionBtn.dataset.mcpName;
+        showMcpArchiveConfirm(mcpName);
+        return;
+      }
+      if (actionBtn.dataset.action === "mcp-restore") {
+        const mcpName = actionBtn.dataset.mcpName;
+        doRestoreMcpServer(mcpName);
+        return;
+      }
+      if (actionBtn.dataset.action === "mcp-copy-to-project") {
+        const mcpName = actionBtn.dataset.mcpName;
+        showCopyArchivedToProjectPicker(mcpName);
+        return;
+      }
+
       const itemEl = actionBtn.closest(".item");
       const item = getItemByKey(itemEl?.dataset.itemKey);
       if (!item) return;
@@ -1223,8 +1240,14 @@ function renderItem(item) {
                        : isFromGlobal   ? `<span class="scope-tag st-global" data-tooltip="Available globally from ~/.claude/ — applies to all projects on this machine">Global</span>`
                        : "";
   const isMcpDisabled = item.category === "mcp" && mcpDisabledNames.has(item.name);
-  const mcpToggleBtn = item.category === "mcp"
+  const mcpToggleBtn = item.category === "mcp" && !item.archived
     ? `<button type="button" class="act-btn ${isMcpDisabled ? "act-mcp-enable" : "act-mcp-disable"}" data-action="mcp-toggle" data-mcp-name="${esc(item.name)}" title="${isMcpDisabled ? "Re-enable in this project" : "Disable in this project"}">${isMcpDisabled ? "Enable" : "Disable"}</button>`
+    : "";
+  const mcpArchiveBtn = item.category === "mcp" && !item.archived && item.scopeId === "global" && !isFromGlobal
+    ? `<button type="button" class="act-btn act-mcp-disable" data-action="mcp-archive" data-mcp-name="${esc(item.name)}" title="Archive — remove from active global config">Archive</button>`
+    : "";
+  const mcpArchivedActions = item.archived
+    ? `<span class="item-actions"><button type="button" class="act-btn act-mcp-enable" data-action="mcp-restore" data-mcp-name="${esc(item.name)}" title="Restore to active global config">Restore</button><button type="button" class="act-btn" data-action="mcp-copy-to-project" data-mcp-name="${esc(item.name)}" title="Copy config to a project">Copy to Project</button></span>`
     : "";
   // Session rows get Resume + Distill instead of Move/Open/Del
   const sessionActions = item.subType === "session" ? `
@@ -1233,15 +1256,16 @@ function renderItem(item) {
       <button type="button" class="act-btn act-distill" data-action="distill" title="Distill session (backup + clean)">Distill</button>
     </span>` : null;
 
-  const actions = sessionActions || ((item.locked || isFromGlobal) ? (mcpToggleBtn ? `<span class="item-actions">${mcpToggleBtn}</span>` : "") : `
+  const actions = item.archived ? mcpArchivedActions : (sessionActions || ((item.locked || isFromGlobal) ? (mcpToggleBtn ? `<span class="item-actions">${mcpToggleBtn}</span>` : "") : `
     <span class="item-actions">
       ${(canMoveItem(item) || item.locked) ? `<button type="button" class="act-btn act-move" data-action="move">Move</button>` : ""}
       ${item.category !== "mcp" ? `<button type="button" class="act-btn act-open" data-action="open">Open</button>` : ""}
       ${canDeleteItem(item) ? `<button type="button" class="act-btn act-del" data-action="delete">Del</button>` : ""}
       ${mcpToggleBtn}
-    </span>`);
+      ${mcpArchiveBtn}
+    </span>`));
 
-  const dragHandle = item.locked ? "" : `<span class="drag-handle" title="Drag to move">⠿</span>`;
+  const dragHandle = (item.locked || item.archived) ? "" : `<span class="drag-handle" title="Drag to move">⠿</span>`;
 
   // Security badge for MCP items
   const secSev = item.category === "mcp" ? getSecuritySeverity(item.name) : null;
@@ -1258,13 +1282,13 @@ function renderItem(item) {
       : "";
 
   return `
-    <div class="item${item.locked ? " locked" : ""}${isSelected ? " selected" : ""}${isMcpDisabled ? " mcp-disabled" : ""}" data-item-key="${esc(key)}" data-path="${esc(item.path)}" data-category="${esc(item.category)}">
+    <div class="item${item.locked ? " locked" : ""}${isSelected ? " selected" : ""}${isMcpDisabled ? " mcp-disabled" : ""}${item.archived ? " mcp-archived" : ""}" data-item-key="${esc(key)}" data-path="${esc(item.path)}" data-category="${esc(item.category)}">
       ${dragHandle}
       ${checkbox}
       <span class="item-ico">${icon}</span>
       ${effectiveBadge}
       <span class="item-name">${esc(item.name)}</span>
-      ${secBadgeHtml}${blFlagHtml}${isMcpDisabled ? `<span class="mcp-disabled-badge" title="Disabled in this project — all servers named '${esc(item.name)}' won't load here">Disabled</span>` : ""}
+      ${secBadgeHtml}${blFlagHtml}${isMcpDisabled ? `<span class="mcp-disabled-badge" title="Disabled in this project — all servers named '${esc(item.name)}' won't load here">Disabled</span>` : ""}${item.archived ? `<span class="mcp-archived-badge" title="Archived — removed from active global config">Archived</span>` : ""}
       ${badgeHtml}
       <span class="item-desc">${item.category === "mcp" ? "" : esc(desc)}</span>
       ${actions}
@@ -3540,6 +3564,129 @@ function showMcpDisableConfirm(scope, mcpName) {
     overlay.remove();
     if (!scope.repoDir) { toast("No project path — select a project scope", true); return; }
     toggleMcpDisabled(scope.repoDir, mcpName, "disable");
+  });
+}
+
+// ── MCP Archive Functions ───────────────────────────────────────────
+
+function doArchiveMcpServer(serverName) {
+  fetchJson("/api/mcp-archive", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ serverName, action: "archive" }),
+  }).then(res => {
+    if (res.ok) {
+      refreshUI();
+      toast(`Archived "${serverName}" — removed from active global config`);
+    } else {
+      toast(res.error || "Failed to archive server", true);
+    }
+  });
+}
+
+function doRestoreMcpServer(serverName) {
+  fetchJson("/api/mcp-archive", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ serverName, action: "restore" }),
+  }).then(res => {
+    if (res.ok) {
+      refreshUI();
+      toast(`Restored "${serverName}" to active global config`);
+    } else {
+      toast(res.error || "Failed to restore server", true);
+    }
+  });
+}
+
+function doCopyArchivedToProject(serverName, projectPath) {
+  fetchJson("/api/mcp-archive-copy", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ serverName, projectPath }),
+  }).then(res => {
+    if (res.ok) {
+      refreshUI();
+      toast(`Copied "${serverName}" to project`);
+    } else {
+      toast(res.error || "Failed to copy server to project", true);
+    }
+  });
+}
+
+function showMcpArchiveConfirm(mcpName) {
+  document.querySelector(".mcp-confirm-overlay")?.remove();
+
+  const overlay = document.createElement("div");
+  overlay.className = "mcp-confirm-overlay";
+  overlay.innerHTML = `
+    <div class="modal">
+      <h3>Archive "${esc(mcpName)}"?</h3>
+      <p class="modal-sub">This will <strong>remove</strong> the server from your active global MCP config so Claude Code won't load it.</p>
+      <p class="modal-sub">The config will be saved in <code>~/.claude/.mcp-archive.json</code> and can be restored later.</p>
+      <div class="modal-btns">
+        <button class="d-btn mcp-confirm-cancel">Cancel</button>
+        <button class="d-btn d-btn-del mcp-confirm-ok">Archive</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(overlay);
+
+  overlay.querySelector(".mcp-confirm-cancel").addEventListener("click", () => overlay.remove());
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+  overlay.querySelector(".mcp-confirm-ok").addEventListener("click", (e) => {
+    e.stopPropagation();
+    overlay.remove();
+    doArchiveMcpServer(mcpName);
+  });
+}
+
+function showCopyArchivedToProjectPicker(mcpName) {
+  document.querySelector(".mcp-confirm-overlay")?.remove();
+
+  // Get project scopes from data
+  const projectScopes = (data?.scopes || []).filter(s => s.id !== "global" && s.repoDir);
+  if (projectScopes.length === 0) {
+    toast("No project scopes found — open a project in Claude Code first", true);
+    return;
+  }
+
+  const overlay = document.createElement("div");
+  overlay.className = "mcp-confirm-overlay";
+  overlay.innerHTML = `
+    <div class="modal">
+      <h3>Copy "${esc(mcpName)}" to Project</h3>
+      <p class="modal-sub">Select a project to copy this archived server config into:</p>
+      <div class="dest-list" style="max-height:240px;overflow-y:auto;margin:8px 0;">
+        ${projectScopes.map(s => `
+          <div class="dest" data-scope-id="${esc(s.id)}" data-repo-dir="${esc(s.repoDir)}">
+            <span class="di">📁</span>
+            <span class="dn">${esc(s.name)}</span>
+            <span class="dp">${esc(s.type)}</span>
+          </div>`).join("")}
+      </div>
+      <div class="modal-btns">
+        <button class="d-btn mcp-confirm-cancel">Cancel</button>
+        <button class="d-btn d-btn-move mcp-confirm-ok" disabled>Copy</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(overlay);
+
+  let selectedProjectPath = null;
+  overlay.querySelectorAll(".dest").forEach(entry => {
+    entry.addEventListener("click", () => {
+      overlay.querySelectorAll(".dest").forEach(n => n.classList.remove("sel"));
+      entry.classList.add("sel");
+      selectedProjectPath = entry.dataset.repoDir;
+      overlay.querySelector(".mcp-confirm-ok").disabled = false;
+    });
+  });
+
+  overlay.querySelector(".mcp-confirm-cancel").addEventListener("click", () => overlay.remove());
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+  overlay.querySelector(".mcp-confirm-ok").addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (!selectedProjectPath) return;
+    overlay.remove();
+    doCopyArchivedToProject(mcpName, selectedProjectPath);
   });
 }
 
