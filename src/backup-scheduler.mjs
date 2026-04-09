@@ -19,14 +19,15 @@ function systemdDir() {
   return join(HOME, ".config", "systemd", "user");
 }
 
-function serviceContent(nodePath, cliPath) {
+function serviceContent() {
   return `[Unit]
 Description=Claude Code Backup — scan and push settings to GitHub
 
 [Service]
 Type=oneshot
-ExecStart=${nodePath} ${cliPath} --backup run --quiet
+ExecStart=npx @mcpware/claude-code-organizer --backup run --quiet
 Environment=HOME=${HOME}
+Environment=PATH=${process.env.PATH}
 `;
 }
 
@@ -44,11 +45,11 @@ WantedBy=timers.target
 `;
 }
 
-async function installSystemd(nodePath, cliPath, intervalHours) {
+async function installSystemd(intervalHours) {
   const dir = systemdDir();
   await mkdir(dir, { recursive: true });
 
-  await writeFile(join(dir, `${SERVICE_NAME}.service`), serviceContent(nodePath, cliPath));
+  await writeFile(join(dir, `${SERVICE_NAME}.service`), serviceContent());
   await writeFile(join(dir, `${SERVICE_NAME}.timer`), timerContent(intervalHours));
 
   await exec("systemctl", ["--user", "daemon-reload"]);
@@ -88,15 +89,6 @@ async function isInstalledSystemd() {
   }
 }
 
-async function getNodeAndCliPathSystemd() {
-  try {
-    const { readFile } = await import("node:fs/promises");
-    const content = await readFile(join(systemdDir(), `${SERVICE_NAME}.service`), "utf-8");
-    const match = content.match(/ExecStart=(\S+)\s+(\S+)\s+run/);
-    if (match) return { nodePath: match[1], cliPath: match[2] };
-  } catch {}
-  return null;
-}
 
 // ── macOS (launchd plist) ───────────────────────────────────────────
 
@@ -108,7 +100,13 @@ function plistLabel() {
   return `com.mcpware.${SERVICE_NAME}`;
 }
 
-function plistContent(nodePath, cliPath, intervalSeconds) {
+function npxPath() {
+  // Resolve npx from the same directory as the current node binary
+  const nodeDir = process.execPath.replace(/\/[^/]+$/, "");
+  return join(nodeDir, "npx");
+}
+
+function plistContent(intervalSeconds) {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -117,8 +115,8 @@ function plistContent(nodePath, cliPath, intervalSeconds) {
   <string>${plistLabel()}</string>
   <key>ProgramArguments</key>
   <array>
-    <string>${nodePath}</string>
-    <string>${cliPath}</string>
+    <string>${npxPath()}</string>
+    <string>@mcpware/claude-code-organizer</string>
     <string>--backup</string>
     <string>run</string>
     <string>--quiet</string>
@@ -127,6 +125,11 @@ function plistContent(nodePath, cliPath, intervalSeconds) {
   <integer>${intervalSeconds}</integer>
   <key>RunAtLoad</key>
   <true/>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>${process.env.PATH}</string>
+  </dict>
   <key>StandardOutPath</key>
   <string>${HOME}/.claude-backups/backup.log</string>
   <key>StandardErrorPath</key>
@@ -136,11 +139,11 @@ function plistContent(nodePath, cliPath, intervalSeconds) {
 `;
 }
 
-async function installLaunchd(nodePath, cliPath, intervalHours) {
+async function installLaunchd(intervalHours) {
   const dir = launchdDir();
   await mkdir(dir, { recursive: true });
   const plistPath = join(dir, `${plistLabel()}.plist`);
-  await writeFile(plistPath, plistContent(nodePath, cliPath, intervalHours * 3600));
+  await writeFile(plistPath, plistContent(intervalHours * 3600));
   try { await exec("launchctl", ["unload", plistPath]); } catch {}
   await exec("launchctl", ["load", plistPath]);
   return { plistPath };
@@ -184,9 +187,9 @@ async function getNodeAndCliPathLaunchd() {
 
 // ── Public API ──────────────────────────────────────────────────────
 
-export async function install(nodePath, cliPath, intervalHours = 4) {
-  if (platform() === "darwin") return installLaunchd(nodePath, cliPath, intervalHours);
-  return installSystemd(nodePath, cliPath, intervalHours);
+export async function install(intervalHours = 4) {
+  if (platform() === "darwin") return installLaunchd(intervalHours);
+  return installSystemd(intervalHours);
 }
 
 export async function remove() {
@@ -204,7 +207,3 @@ export async function isInstalled() {
   return isInstalledSystemd();
 }
 
-export async function getNodeAndCliPath() {
-  if (platform() === "darwin") return getNodeAndCliPathLaunchd();
-  return getNodeAndCliPathSystemd();
-}

@@ -217,10 +217,7 @@ if (isBackupMode) {
     const { install } = await import('../src/backup-scheduler.mjs');
     const { writeFile: wf, readFile: rf } = await import('node:fs/promises');
 
-    const nodePath = process.execPath;
-    const cliPath = join(import.meta.dirname, 'cli.mjs');
-
-    const result = await install(nodePath, cliPath, hours);
+    const result = await install(hours);
     let config = {};
     try { config = JSON.parse(await rf(BACKUP_CONFIG, 'utf-8')); } catch {}
     await wf(BACKUP_CONFIG, JSON.stringify({ ...config, interval: hours }, null, 2) + '\n');

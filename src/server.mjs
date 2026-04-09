@@ -1029,10 +1029,7 @@ async function handleRequest(req, res) {
       const { readFile: rf, writeFile: wf } = await import("node:fs/promises");
       const { install } = await import("./backup-scheduler.mjs");
 
-      const nodePath = process.execPath;
-      const cliPath = join(import.meta.dirname, "..", "bin", "cli.mjs");
-
-      await install(nodePath, cliPath, intervalHours);
+      await install(intervalHours);
 
       let config = {};
       try { config = JSON.parse(await rf(BACKUP_CONFIG, "utf-8")); } catch {}
