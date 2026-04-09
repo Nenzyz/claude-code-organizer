@@ -6,6 +6,7 @@
  *   node bin/cli.mjs              → Start web dashboard (HTTP server)
  *   node bin/cli.mjs --mcp        → Start MCP server (stdio, for AI clients)
  *   node bin/cli.mjs --port 3847  → Start web dashboard on custom port
+ *   node bin/cli.mjs --no-open    → Start web dashboard without opening browser
  *   node bin/cli.mjs --backup init <remote-url>  → Init backup repo with optional remote
  *   node bin/cli.mjs --backup run                → Run backup now (export + commit + push)
  *   node bin/cli.mjs --backup status             → Show backup status
