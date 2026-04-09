@@ -6,6 +6,11 @@
  *   node bin/cli.mjs              → Start web dashboard (HTTP server)
  *   node bin/cli.mjs --mcp        → Start MCP server (stdio, for AI clients)
  *   node bin/cli.mjs --port 3847  → Start web dashboard on custom port
+ *   node bin/cli.mjs --backup init <remote-url>  → Init backup repo with optional remote
+ *   node bin/cli.mjs --backup run                → Run backup now (export + commit + push)
+ *   node bin/cli.mjs --backup status             → Show backup status
+ *   node bin/cli.mjs --backup schedule [hours]   → Install scheduled backup (default: 4h)
+ *   node bin/cli.mjs --backup unschedule         → Remove scheduled backup
  */
 
 import { access, constants, mkdir, writeFile, readFile } from 'node:fs/promises';
@@ -16,6 +21,8 @@ const args = process.argv.slice(2);
 const isMcpMode = args.includes('--mcp');
 const distillIdx = args.indexOf('--distill');
 const isDistillMode = distillIdx !== -1;
+const backupIdx = args.indexOf('--backup');
+const isBackupMode = backupIdx !== -1;
 
 // ── Pre-flight check: verify ~/.claude/ exists and is readable ──
 // Skip for MCP mode — server returns empty results if ~/.claude/ missing
@@ -87,7 +94,160 @@ async function checkForUpdate() {
   return null;
 }
 
-if (isDistillMode) {
+if (isBackupMode) {
+  // CLI backup mode: npx @mcpware/claude-code-organizer --backup <command> [args]
+  const subCmd = args[backupIdx + 1] || 'help';
+  const BACKUP_DIR = join(homedir(), '.claude-backups');
+  const BACKUP_CONFIG = join(BACKUP_DIR, 'config.json');
+
+  if (subCmd === 'init') {
+    const remoteUrl = args[backupIdx + 2];
+    const { mkdir: mk, writeFile: wf } = await import('node:fs/promises');
+    const { isGitRepo, initRepo, hasRemote, addRemote, getRemoteUrl } = await import('../src/backup-git.mjs');
+
+    await mk(BACKUP_DIR, { recursive: true });
+
+    if (!(await isGitRepo(BACKUP_DIR))) {
+      await initRepo(BACKUP_DIR);
+      await wf(join(BACKUP_DIR, '.gitignore'), 'backup-*/\n*.log\nconfig.json\n');
+      console.log(`  ✓ Initialized backup repo at ${BACKUP_DIR}`);
+    } else {
+      console.log(`  ✓ Backup repo already exists at ${BACKUP_DIR}`);
+    }
+
+    if (remoteUrl) {
+      if (await hasRemote(BACKUP_DIR)) {
+        const { execFile } = await import('node:child_process');
+        const { promisify } = await import('node:util');
+        await promisify(execFile)('git', ['remote', 'set-url', 'origin', remoteUrl], { cwd: BACKUP_DIR });
+        console.log(`  ✓ Updated remote: ${remoteUrl}`);
+      } else {
+        await addRemote(BACKUP_DIR, remoteUrl);
+        console.log(`  ✓ Added remote: ${remoteUrl}`);
+      }
+    } else {
+      console.log(`  ℹ No remote set. Add one with: npx @mcpware/claude-code-organizer --backup init <git-url>`);
+    }
+
+  } else if (subCmd === 'run') {
+    const { rm, mkdir: mk, copyFile: cpf, writeFile: wf, cp: cpDir, readFile: rf } = await import('node:fs/promises');
+    const { basename } = await import('node:path');
+    const { isGitRepo, commitAndPush } = await import('../src/backup-git.mjs');
+    const { scan } = await import('../src/scanner.mjs');
+
+    if (!(await isGitRepo(BACKUP_DIR))) {
+      console.error(`  ✗ Backup repo not initialized. Run: npx @mcpware/claude-code-organizer --backup init`);
+      process.exit(1);
+    }
+
+    const quiet = args.includes('--quiet');
+    if (!quiet) console.log('  Scanning...');
+    const scanData = await scan();
+    const latestDir = join(BACKUP_DIR, 'latest');
+    try { await rm(latestDir, { recursive: true, force: true }); } catch {}
+
+    let copied = 0;
+    const errors = [];
+    const exportableItems = scanData.items.filter(i => i.category !== 'setting' && i.category !== 'hook');
+
+    for (const item of exportableItems) {
+      try {
+        const subDir = join(latestDir, item.scopeId, item.category);
+        await mk(subDir, { recursive: true });
+        if (item.category === 'skill') {
+          await cpDir(item.path, join(subDir, item.fileName || basename(item.path)), { recursive: true });
+        } else if (item.category === 'mcp') {
+          await wf(join(subDir, `${item.name}.json`), JSON.stringify({ [item.name]: item.mcpConfig || {} }, null, 2) + '\n');
+        } else if (item.category === 'plugin' && item.path) {
+          await cpDir(item.path, join(subDir, item.fileName || basename(item.path)), { recursive: true });
+        } else if (item.path) {
+          await cpf(item.path, join(subDir, item.fileName || basename(item.path)));
+        }
+        copied++;
+      } catch (e) {
+        errors.push(`${item.category}/${item.name}: ${e.message}`);
+      }
+    }
+
+    await wf(join(latestDir, 'backup-summary.json'), JSON.stringify({
+      exportedAt: new Date().toISOString(), totalItems: exportableItems.length, copied, errors: errors.length, counts: scanData.counts,
+    }, null, 2) + '\n');
+
+    const gitResult = await commitAndPush(BACKUP_DIR);
+
+    let config = {};
+    try { config = JSON.parse(await rf(BACKUP_CONFIG, 'utf-8')); } catch {}
+    await wf(BACKUP_CONFIG, JSON.stringify({ ...config, lastRun: new Date().toISOString(), lastCopied: copied, lastErrors: errors.length }, null, 2) + '\n');
+
+    if (!quiet) {
+      console.log(`\n  Backup Complete`);
+      console.log(`  ───────────────`);
+      console.log(`  Items: ${copied} exported${errors.length ? `, ${errors.length} errors` : ''}`);
+      console.log(`  Git:   ${gitResult.committed ? gitResult.message : 'No changes to commit'}${gitResult.pushed ? ' (pushed)' : ''}`);
+      if (errors.length) errors.forEach(e => console.log(`  ⚠ ${e}`));
+      console.log();
+    }
+
+  } else if (subCmd === 'status') {
+    const { readFile: rf } = await import('node:fs/promises');
+    const { isGitRepo, hasRemote, getRemoteUrl, getLastCommit } = await import('../src/backup-git.mjs');
+    const { isInstalled, status: schedulerStatus } = await import('../src/backup-scheduler.mjs');
+
+    let config = {};
+    try { config = JSON.parse(await rf(BACKUP_CONFIG, 'utf-8')); } catch {}
+
+    const gitRepo = await isGitRepo(BACKUP_DIR);
+    const remote = gitRepo ? await hasRemote(BACKUP_DIR) : false;
+    const remoteUrl = remote ? await getRemoteUrl(BACKUP_DIR) : null;
+    const lastCommit = gitRepo ? await getLastCommit(BACKUP_DIR) : { msg: null, date: null };
+    const scheduled = await isInstalled();
+
+    console.log(`\n  Backup Status`);
+    console.log(`  ─────────────`);
+    console.log(`  Repo:      ${gitRepo ? BACKUP_DIR : 'Not initialized'}`);
+    console.log(`  Remote:    ${remoteUrl || 'None'}`);
+    console.log(`  Last run:  ${config.lastRun || 'Never'}`);
+    console.log(`  Last copy: ${config.lastCopied ?? '—'} items${config.lastErrors ? ` (${config.lastErrors} errors)` : ''}`);
+    console.log(`  Last commit: ${lastCommit.msg || '—'} ${lastCommit.date ? `(${lastCommit.date})` : ''}`);
+    console.log(`  Scheduler: ${scheduled ? `Active (every ${config.interval || 4}h)` : 'Not installed'}`);
+    console.log();
+
+  } else if (subCmd === 'schedule') {
+    const hours = parseInt(args[backupIdx + 2], 10) || 4;
+    const { install } = await import('../src/backup-scheduler.mjs');
+    const { writeFile: wf, readFile: rf } = await import('node:fs/promises');
+
+    const nodePath = process.execPath;
+    const cliPath = join(import.meta.dirname, 'cli.mjs');
+
+    const result = await install(nodePath, cliPath, hours);
+    let config = {};
+    try { config = JSON.parse(await rf(BACKUP_CONFIG, 'utf-8')); } catch {}
+    await wf(BACKUP_CONFIG, JSON.stringify({ ...config, interval: hours }, null, 2) + '\n');
+
+    console.log(`  ✓ Backup scheduled every ${hours} hours`);
+    if (result.plistPath) console.log(`  LaunchAgent: ${result.plistPath}`);
+    if (result.servicePath) console.log(`  Service: ${result.servicePath}`);
+
+  } else if (subCmd === 'unschedule') {
+    const { remove } = await import('../src/backup-scheduler.mjs');
+    await remove();
+    console.log('  ✓ Backup schedule removed');
+
+  } else {
+    console.log(`
+  Usage: npx @mcpware/claude-code-organizer --backup <command>
+
+  Commands:
+    init [remote-url]    Initialize backup repo (optionally set git remote)
+    run                  Run backup now (export + commit + push)
+    status               Show backup status and config
+    schedule [hours]     Install scheduled backup (default: every 4 hours)
+    unschedule           Remove scheduled backup
+`);
+  }
+
+} else if (isDistillMode) {
   // CLI distill mode: npx @mcpware/claude-code-organizer --distill <session.jsonl>
   const sessionPath = args[distillIdx + 1];
   if (!sessionPath || !sessionPath.endsWith('.jsonl')) {
