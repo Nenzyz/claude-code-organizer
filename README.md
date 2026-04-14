@@ -17,15 +17,15 @@ English | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [�
 
 **Claude Code Organizer (CCO)** is a free, open-source dashboard that lets you manage all Claude Code configuration — memories, skills, MCP servers, settings, agents, rules, and hooks — across global and project scopes. It includes a security scanner for MCP tool poisoning and prompt injection, a per-item context token budget tracker, per-project MCP enable/disable controls, and bulk cleanup for duplicate configs. All without leaving the window.
 
-> **v0.18.0** — Backup Center: one click backs up every memory, skill, MCP config, rule, plan, agent, and session to a private GitHub repo. Auto-runs every 4 hours via systemd. See git history. Never lose your Claude setup again.
+> **v0.18.0** — Backup Center: one click backs up every memory, skill, MCP config, rule, plan, agent, and session to a private GitHub repo. Auto-runs every 4 hours with the native scheduler on your platform. See git history. Never lose your Claude setup again.
 
 > Scan for poisoned MCP servers. Reclaim wasted context tokens. Disable MCP servers per-project. Find and delete duplicate memories. Move misplaced configs where they belong.
 
-> **Privacy:** CCO reads Claude Code config files on your machine (global and project-level). Nothing is sent externally. Zero telemetry.
+> **Privacy:** CCO reads Claude Code config files on your machine (global and project-level). It does not send usage telemetry. It does check the npm registry for version updates unless network access is blocked.
 
 ![Claude Code Organizer Demo](docs/demo.gif)
 
-<sub>297 tests (124 unit + 173 E2E) | Zero dependencies | Demo recorded by AI using [Pagecast](https://github.com/mcpware/pagecast)</sub>
+<sub>324 tests (124 unit + 200 E2E) | Zero dependencies | Demo recorded by AI using [Pagecast](https://github.com/mcpware/pagecast)</sub>
 
 > 100+ stars in 5 days. Built by a CS dropout who found 140 invisible config files controlling Claude and decided no one should have to `cat` each one. First open source project — thank you to everyone who starred, tested, and reported issues.
 
@@ -219,8 +219,10 @@ Every constant, merge rule, and policy check cites the specific source file it w
 |----------|:------:|
 | Ubuntu / Linux | Supported |
 | macOS (Intel + Apple Silicon) | Supported |
-| Windows 11 | Supported |
+| Windows 11 | Partial (dashboard yes, backup scheduler no) |
 | WSL | Supported |
+
+Automatic Backup Center scheduling currently uses `systemd` on Linux/WSL and `launchd` on macOS.
 
 ## Roadmap
 

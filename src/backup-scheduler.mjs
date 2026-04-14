@@ -3,7 +3,7 @@
  * Used by Backup Center in CCO and by the standalone claude-code-backup CLI.
  */
 
-import { writeFile, mkdir, unlink, access } from "node:fs/promises";
+import { writeFile, mkdir, unlink, access, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir, platform } from "node:os";
 import { execFile } from "node:child_process";
@@ -169,6 +169,18 @@ async function isInstalledLaunchd() {
   }
 }
 
+async function getNodeAndCliPathLaunchd() {
+  try {
+    const plistPath = join(launchdDir(), `${plistLabel()}.plist`);
+    const content = await readFile(plistPath, "utf-8");
+    const block = content.match(/<key>ProgramArguments<\/key>\s*<array>([\s\S]*?)<\/array>/);
+    if (!block) return null;
+    const args = [...block[1].matchAll(/<string>([^<]+)<\/string>/g)].map((m) => m[1]);
+    if (args.length >= 2) return { nodePath: args[0], cliPath: args[1] };
+  } catch {}
+  return null;
+}
+
 // ── Public API ──────────────────────────────────────────────────────
 
 export async function install(nodePath, cliPath, intervalHours = 4) {
@@ -192,6 +204,6 @@ export async function isInstalled() {
 }
 
 export async function getNodeAndCliPath() {
-  if (platform() === "darwin") return null; // not implemented for macOS
+  if (platform() === "darwin") return getNodeAndCliPathLaunchd();
   return getNodeAndCliPathSystemd();
 }

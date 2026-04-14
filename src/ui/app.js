@@ -882,7 +882,7 @@ function renderSidebarScope(scope, overrideChildHtml) {
           ${childHtml ? `<div class="s-children">${childHtml}</div>` : ""}
         </div>` : (hasNestedContent && !showBody ? `
         <div class="s-scope-body collapsed">
-          ${categoryRows ? `<div>${categoryRows}</div>` : ""}
+          ${(!isDragMode && categoryRows) ? `<div>${categoryRows}</div>` : ""}
           ${childHtml ? `<div class="s-children">${childHtml}</div>` : ""}
         </div>` : "")}
     </div>`;
@@ -1748,7 +1748,7 @@ async function openBackupModal() {
     document.getElementById("bkpSchedDesc").textContent =
       status.schedulerInstalled ? `Every ${status.interval || 4} hours + on boot` : "Not running";
     document.getElementById("bkpSchedNext").textContent =
-      status.schedulerInstalled ? "systemd timer active" : "";
+      status.schedulerInstalled ? "Background scheduler active" : "";
 
     // Set interval selector to current value
     const sel = document.getElementById("bkpInterval");
@@ -3995,12 +3995,27 @@ function renderSecurityResults(scanData) {
   footerNote.textContent = `${scanTime}`;
 }
 
+/**
+ * The baseline file is updated during a successful scan, so "first scan"
+ * is only meaningful for the active in-memory result. If we persist it into
+ * cache, reopening the app will incorrectly resurrect stale NEW badges.
+ */
+function getPersistableSecurityScanData(scanData) {
+  if (!scanData || typeof scanData !== "object") return scanData;
+  return {
+    ...scanData,
+    baselines: Array.isArray(scanData.baselines)
+      ? scanData.baselines.map((b) => b?.isFirstScan ? { ...b, isFirstScan: false } : b)
+      : scanData.baselines,
+  };
+}
+
 /** Save security scan results to server for persistence across sessions. */
 function saveSecurityResults(scanData) {
   fetch("/api/security-cache", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(scanData),
+    body: JSON.stringify(getPersistableSecurityScanData(scanData)),
   }).catch(() => {}); // Fire and forget
 }
 
@@ -4013,8 +4028,9 @@ async function loadCachedSecurityResults() {
 
     securityScanResults = cached.data;
 
-    // Rebuild badge map (don't reset baselineStatus — checkForNewMcpServers may have set it)
+    // Rebuild badge map from cached results.
     securityBadges = {};
+    securityBaselineStatus = {};
     for (const server of (cached.data.servers || [])) {
       if (server.findings?.length > 0) {
         const maxSev = server.findings.reduce((max, f) => {
@@ -4026,9 +4042,11 @@ async function loadCachedSecurityResults() {
         securityBadges[server.serverName] = "unreachable";
       }
     }
+    // Never restore NEW from cache. "New since last scan" must be computed
+    // against the current baseline file on startup, otherwise stale cache
+    // keeps re-flagging servers that were already acknowledged by a scan.
     for (const b of (cached.data.baselines || [])) {
-      if (b.isFirstScan) securityBaselineStatus[b.serverName] = "new";
-      else if (b.hasChanges) securityBaselineStatus[b.serverName] = "changed";
+      if (b.hasChanges && !b.isFirstScan) securityBaselineStatus[b.serverName] = "changed";
     }
 
     // Hide intro (results will render when user opens security panel)

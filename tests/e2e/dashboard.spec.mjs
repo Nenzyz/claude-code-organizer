@@ -392,7 +392,7 @@ test.describe('API Layer', () => {
 
     expect(counts.memory).toBe(7);   // 4 global + 1 project + 1 nested + 1 deep
     expect(counts.skill).toBeGreaterThanOrEqual(3);    // 2 global + 1 project (may find more if /cco skill installed)
-    expect(counts.mcp).toBe(3);      // 2 global + 1 project MCP
+    expect(counts.mcp).toBe(4);      // 2 global + 2 project MCP entries
     expect(counts.config).toBeGreaterThanOrEqual(2); // global settings + project CLAUDE.md + project settings
     expect(counts.hook).toBe(2);     // 1 global hook + 1 project hook
     expect(counts.plan).toBe(2);     // 1 global plan + 1 project plan
@@ -548,7 +548,7 @@ test.describe('API Layer', () => {
     await expect(toast).toContainText('Copied');
   });
 
-  test('session has delete and open buttons but no move button in UI', async ({ page }) => {
+  test('session row exposes resume + distill actions only', async ({ page }) => {
     await page.goto(env.baseURL);
     await page.waitForSelector('#loading', { state: 'hidden' });
     // Sessions are in project scope, click it
@@ -556,8 +556,11 @@ test.describe('API Layer', () => {
     await page.waitForTimeout(500);
     const sessionRow = page.locator('.item[data-category="session"]').first();
     if (await sessionRow.count() > 0) {
-      await expect(sessionRow.locator('.act-btn[data-action="delete"]')).toHaveCount(1);
+      await expect(sessionRow.locator('.act-btn[data-action="resume"]')).toHaveCount(1);
+      await expect(sessionRow.locator('.act-btn[data-action="distill"]')).toHaveCount(1);
       await expect(sessionRow.locator('.act-btn[data-action="move"]')).toHaveCount(0);
+      await expect(sessionRow.locator('.act-btn[data-action="open"]')).toHaveCount(0);
+      await expect(sessionRow.locator('.act-btn[data-action="delete"]')).toHaveCount(0);
     }
   });
 
@@ -1977,24 +1980,28 @@ test.describe('New categories — scan', () => {
 
   test('scan detects global and project commands', async () => {
     const { items } = await (await fetch(`${env.baseURL}/api/scan`)).json();
-    const globalCmd = items.find(i => i.category === 'command' && i.scopeId === 'global');
-    const projectCmd = items.find(i => i.category === 'command' && i.scopeId === env.encodedProject);
+    const globalCmd = items.find(i => i.category === 'command' && i.scopeId === 'global' && i.name === 'deploy');
+    const projectCmd = items.find(i => i.category === 'command' && i.scopeId === env.encodedProject && i.name === 'local-build');
+    const projectConflict = items.find(i => i.category === 'command' && i.scopeId === env.encodedProject && i.name === 'deploy');
     expect(globalCmd).toBeTruthy();
     expect(globalCmd.name).toBe('deploy');
     expect(globalCmd.description).toBe('Deploy to production');
     expect(projectCmd).toBeTruthy();
     expect(projectCmd.name).toBe('local-build');
+    expect(projectConflict).toBeTruthy();
   });
 
   test('scan detects global and project agents', async () => {
     const { items } = await (await fetch(`${env.baseURL}/api/scan`)).json();
-    const globalAgent = items.find(i => i.category === 'agent' && i.scopeId === 'global');
-    const projectAgent = items.find(i => i.category === 'agent' && i.scopeId === env.encodedProject);
+    const globalAgent = items.find(i => i.category === 'agent' && i.scopeId === 'global' && i.name === 'code-reviewer');
+    const projectAgent = items.find(i => i.category === 'agent' && i.scopeId === env.encodedProject && i.name === 'test-runner');
+    const projectShadow = items.find(i => i.category === 'agent' && i.scopeId === env.encodedProject && i.name === 'code-reviewer');
     expect(globalAgent).toBeTruthy();
     expect(globalAgent.name).toBe('code-reviewer');
     expect(globalAgent.description).toBe('Reviews code for bugs and quality');
     expect(projectAgent).toBeTruthy();
     expect(projectAgent.name).toBe('test-runner');
+    expect(projectShadow).toBeTruthy();
   });
 
   test('scan detects project rules as movable', async () => {
@@ -2007,8 +2014,8 @@ test.describe('New categories — scan', () => {
 
   test('counts include new categories', async () => {
     const { counts } = await (await fetch(`${env.baseURL}/api/scan`)).json();
-    expect(counts.command).toBe(2); // 1 global + 1 project
-    expect(counts.agent).toBe(2);  // 1 global + 1 project
+    expect(counts.command).toBe(3); // 1 global + 2 project
+    expect(counts.agent).toBe(3);  // 1 global + 2 project
     expect(counts.rule).toBe(1);   // 1 project
   });
 
@@ -2032,7 +2039,51 @@ test.describe('New categories — move', () => {
   test.beforeEach(async () => { env = await createTestEnv(); });
   test.afterEach(async () => { await env.cleanup(); });
 
-  test('move command from global to project', async () => {
+  test('move unique command from project to global', async () => {
+    const { items } = await (await fetch(`${env.baseURL}/api/scan`)).json();
+    const cmd = items.find(i => i.name === 'local-build' && i.category === 'command' && i.scopeId === env.encodedProject);
+    expect(cmd).toBeTruthy();
+
+    const res = await fetch(`${env.baseURL}/api/move`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ itemPath: cmd.path, toScopeId: 'global', category: 'command', name: 'local-build' }),
+    });
+    expect((await res.json()).ok).toBe(true);
+
+    // Verify on disk
+    expect(await fileExists(cmd.path)).toBe(false);
+    const dstPath = join(env.tmpDir, '.claude', 'commands', 'local-build.md');
+    expect(await fileExists(dstPath)).toBe(true);
+
+    // Rescan confirms
+    const after = await (await fetch(`${env.baseURL}/api/scan`)).json();
+    const moved = after.items.find(i => i.name === 'local-build' && i.category === 'command');
+    expect(moved.scopeId).toBe('global');
+  });
+
+  test('move unique agent from project to global', async () => {
+    const { items } = await (await fetch(`${env.baseURL}/api/scan`)).json();
+    const agent = items.find(i => i.name === 'test-runner' && i.category === 'agent' && i.scopeId === env.encodedProject);
+    expect(agent).toBeTruthy();
+
+    const res = await fetch(`${env.baseURL}/api/move`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ itemPath: agent.path, toScopeId: 'global', category: 'agent', name: 'test-runner' }),
+    });
+    expect((await res.json()).ok).toBe(true);
+
+    expect(await fileExists(agent.path)).toBe(false);
+    const dstPath = join(env.tmpDir, '.claude', 'agents', 'test-runner.md');
+    expect(await fileExists(dstPath)).toBe(true);
+
+    const after = await (await fetch(`${env.baseURL}/api/scan`)).json();
+    const moved = after.items.find(i => i.name === 'test-runner' && i.category === 'agent');
+    expect(moved.scopeId).toBe('global');
+  });
+
+  test('moving command into scope with same name is rejected', async () => {
     const { items } = await (await fetch(`${env.baseURL}/api/scan`)).json();
     const cmd = items.find(i => i.name === 'deploy' && i.category === 'command' && i.scopeId === 'global');
     expect(cmd).toBeTruthy();
@@ -2042,20 +2093,12 @@ test.describe('New categories — move', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ itemPath: cmd.path, toScopeId: env.encodedProject, category: 'command', name: 'deploy' }),
     });
-    expect((await res.json()).ok).toBe(true);
-
-    // Verify on disk
-    expect(await fileExists(cmd.path)).toBe(false);
-    const dstPath = join(env.projectDir, '.claude', 'commands', 'deploy.md');
-    expect(await fileExists(dstPath)).toBe(true);
-
-    // Rescan confirms
-    const after = await (await fetch(`${env.baseURL}/api/scan`)).json();
-    const moved = after.items.find(i => i.name === 'deploy' && i.category === 'command');
-    expect(moved.scopeId).toBe(env.encodedProject);
+    const data = await res.json();
+    expect(data.ok).toBe(false);
+    expect(data.error).toContain('already exists');
   });
 
-  test('move agent from global to project', async () => {
+  test('moving agent into scope with same name is rejected', async () => {
     const { items } = await (await fetch(`${env.baseURL}/api/scan`)).json();
     const agent = items.find(i => i.name === 'code-reviewer' && i.category === 'agent' && i.scopeId === 'global');
     expect(agent).toBeTruthy();
@@ -2065,11 +2108,9 @@ test.describe('New categories — move', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ itemPath: agent.path, toScopeId: env.encodedProject, category: 'agent', name: 'code-reviewer' }),
     });
-    expect((await res.json()).ok).toBe(true);
-
-    expect(await fileExists(agent.path)).toBe(false);
-    const dstPath = join(env.projectDir, '.claude', 'agents', 'code-reviewer.md');
-    expect(await fileExists(dstPath)).toBe(true);
+    const data = await res.json();
+    expect(data.ok).toBe(false);
+    expect(data.error).toContain('already exists');
   });
 
   test('rule can be moved from project to global', async () => {
@@ -2965,6 +3006,33 @@ test.describe('Security Scanner UI', () => {
     await expect(resizer).toBeVisible();
     env.cleanup();
   });
+
+  test('NEW MCP badges do not come back after a completed scan and reload', async ({ page }) => {
+    const env = await createTestEnv();
+    await page.goto(env.baseURL);
+    await page.waitForSelector('#loading', { state: 'hidden' });
+
+    await page.click('#securityScanBtn');
+    if (await page.locator('#securityStartBtn').isVisible()) {
+      await page.click('#securityStartBtn');
+    }
+    await page.waitForSelector('#securityResults:not(.hidden)', { timeout: 60000 });
+
+    const baselineCheck = await (await fetch(`${env.baseURL}/api/security-baseline-check`)).json();
+    expect(baselineCheck.ok).toBe(true);
+    expect(baselineCheck.newServers).toEqual([]);
+
+    await page.reload();
+    await page.waitForSelector('#loading', { state: 'hidden' });
+
+    await page.locator('.s-cat[data-scope-id="global"][data-cat="mcp"]').click();
+    await page.waitForTimeout(500);
+
+    const newBadges = page.locator('.item[data-category="mcp"] .sec-badge.sec-new');
+    await expect(newBadges).toHaveCount(0);
+
+    env.cleanup();
+  });
 });
 
 // ── Path Resolution — underscore/hyphen ambiguity (#17) ────────────
@@ -3134,7 +3202,7 @@ test.describe('Show Effective — per-category rules', () => {
 
     // Global items should have "Global" badge
     const globalBadges = await page.evaluate(() =>
-      document.querySelectorAll('.ib-global').length
+      document.querySelectorAll('.scope-tag.st-global').length
     );
     expect(globalBadges).toBeGreaterThan(0);
   });
@@ -3150,7 +3218,7 @@ test.describe('Show Effective — per-category rules', () => {
 
     // 'test-server' exists in both global and project — global one should be Shadowed
     const shadowed = await page.evaluate(() =>
-      Array.from(document.querySelectorAll('.ib-shadowed')).map(el =>
+      Array.from(document.querySelectorAll('.scope-tag.st-shadowed')).map(el =>
         el.closest('.item')?.querySelector('.item-name')?.textContent
       ).filter(Boolean)
     );
@@ -3168,7 +3236,7 @@ test.describe('Show Effective — per-category rules', () => {
 
     // 'deploy' exists in both global and project — should have Conflict badge
     const conflicts = await page.evaluate(() =>
-      Array.from(document.querySelectorAll('.ib-conflict')).map(el =>
+      Array.from(document.querySelectorAll('.scope-tag.st-conflict')).map(el =>
         el.closest('.item')?.querySelector('.item-name')?.textContent
       ).filter(Boolean)
     );
@@ -3186,7 +3254,7 @@ test.describe('Show Effective — per-category rules', () => {
 
     // 'code-reviewer' exists in both — global one should be Shadowed
     const shadowed = await page.evaluate(() =>
-      Array.from(document.querySelectorAll('.ib-shadowed')).map(el =>
+      Array.from(document.querySelectorAll('.scope-tag.st-shadowed')).map(el =>
         el.closest('.item')?.querySelector('.item-name')?.textContent
       ).filter(Boolean)
     );
