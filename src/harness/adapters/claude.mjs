@@ -308,10 +308,11 @@ async function resolveEncodedProjectPath(encoded) {
     startIdx = 2;
   }
 
-  // Normalize for comparison: lowercase, replace _ and . with -
-  // Claude Code's encoding replaces /, _, and . with -, making it lossy.
-  // By normalizing both sides we can match "My_Projects" or "first.last" against "My-Projects" / "first-last".
-  const norm = (s) => s.toLowerCase().replace(/[_.]/g, "-");
+  // Normalize for comparison: lowercase, replace any non-alphanumeric char with -
+  // Claude Code's encoding replaces ANY character outside [a-z0-9] with dashes —
+  // including /, _, ., spaces, Cyrillic, CJK, emoji, punctuation. Encoding is lossy,
+  // so we mirror the same normalization on real directory names to match them back.
+  const norm = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, "-");
 
   // DFS resolver with backtracking — lists actual directory entries at each
   // level instead of guessing paths, so underscore/hyphen ambiguity is handled.
